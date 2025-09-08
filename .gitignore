@@ -1,5 +1,9 @@
-# ian
+### ian ###
 env_mmpose/
+data/
+# verify mmpose installation
+/td-hm_hrnet-w48_8xb32-210e_coco-256x192.py
+/vis_results.jpg
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
