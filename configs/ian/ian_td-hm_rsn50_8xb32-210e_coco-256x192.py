@@ -1,5 +1,3 @@
-# My duplication of /data/ian/remote_projects/mmpose/configs/
-# body_2d_keypoint/topdown_heatmap/coco/td-hm_res50_8xb64-210e_coco-256x192.py
 _base_ = ['../_base_/default_runtime.py']
 
 # runtime
@@ -8,7 +6,7 @@ train_cfg = dict(max_epochs=210, val_interval=10)
 # optimizer
 optim_wrapper = dict(optimizer=dict(
     type='Adam',
-    lr=5e-4,
+    lr=5e-3,
 ))
 
 # learning policy
@@ -26,14 +24,22 @@ param_scheduler = [
 ]
 
 # automatically scaling LR based on the actual training batch size
-auto_scale_lr = dict(base_batch_size=512)
+auto_scale_lr = dict(base_batch_size=256)
 
 # hooks
-default_hooks = dict(checkpoint=dict(save_best='coco/AP', rule='greater'))
+default_hooks = dict(checkpoint=dict(interval=5, save_last=True,
+                                     save_best='coco/AP', rule='greater'))
 
 # codec settings
-codec = dict(
-    type='MSRAHeatmap', input_size=(192, 256), heatmap_size=(48, 64), sigma=2)
+# multiple kernel_sizes of heatmap gaussian for 'Megvii' approach.
+kernel_sizes = [11, 9, 7, 5]
+codec = [
+    dict(
+        type='MegviiHeatmap',
+        input_size=(192, 256),
+        heatmap_size=(48, 64),
+        kernel_size=kernel_size) for kernel_size in kernel_sizes
+]
 
 # model settings
 model = dict(
@@ -44,26 +50,47 @@ model = dict(
         std=[58.395, 57.12, 57.375],
         bgr_to_rgb=True),
     backbone=dict(
-        type='ResNet',
-        depth=50,
-        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50'),
+        type='RSN',
+        unit_channels=256,
+        num_stages=1,
+        num_units=4,
+        num_blocks=[3, 4, 6, 3],
+        num_steps=4,
+        norm_cfg=dict(type='BN'),
     ),
     head=dict(
-        type='HeatmapHead',
-        in_channels=2048,
+        type='MSPNHead',
+        out_shape=(64, 48),
+        unit_channels=256,
         out_channels=17,
-        loss=dict(type='KeypointMSELoss', use_target_weight=True),
-        decoder=codec),
+        num_stages=1,
+        num_units=4,
+        norm_cfg=dict(type='BN'),
+        # each sub list is for a stage
+        # and each element in each list is for a unit
+        level_indices=[0, 1, 2, 3],
+        loss=[
+            dict(
+                type='KeypointMSELoss',
+                use_target_weight=True,
+                loss_weight=0.25)
+        ] * 3 + [
+            dict(
+                type='KeypointOHKMMSELoss',
+                use_target_weight=True,
+                loss_weight=1.)
+        ],
+        decoder=codec[-1]),
     test_cfg=dict(
         flip_test=True,
         flip_mode='heatmap',
-        shift_heatmap=True,
+        shift_heatmap=False,
     ))
 
 # base dataset settings
 dataset_type = 'CocoDataset'
 data_mode = 'topdown'
-data_root = 'data/coco/'
+data_root = '/data/ian/datasets/coco/'
 
 # pipelines
 train_pipeline = [
@@ -72,21 +99,22 @@ train_pipeline = [
     dict(type='RandomFlip', direction='horizontal'),
     dict(type='RandomHalfBody'),
     dict(type='RandomBBoxTransform'),
-    dict(type='TopdownAffine', input_size=codec['input_size']),
-    dict(type='GenerateTarget', encoder=codec),
+    dict(type='TopdownAffine', input_size=codec[0]['input_size']),
+    dict(type='GenerateTarget', multilevel=True, encoder=codec),
     dict(type='PackPoseInputs')
 ]
+
 val_pipeline = [
     dict(type='LoadImage'),
     dict(type='GetBBoxCenterScale'),
-    dict(type='TopdownAffine', input_size=codec['input_size']),
+    dict(type='TopdownAffine', input_size=codec[0]['input_size']),
     dict(type='PackPoseInputs')
 ]
 
 # data loaders
 train_dataloader = dict(
-    batch_size=64,
-    num_workers=2,
+    batch_size=32,
+    num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
@@ -99,7 +127,7 @@ train_dataloader = dict(
     ))
 val_dataloader = dict(
     batch_size=32,
-    num_workers=2,
+    num_workers=4,
     persistent_workers=True,
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
@@ -119,5 +147,9 @@ test_dataloader = val_dataloader
 # evaluators
 val_evaluator = dict(
     type='CocoMetric',
-    ann_file=data_root + 'annotations/person_keypoints_val2017.json')
+    ann_file=data_root + 'annotations/person_keypoints_val2017.json',
+    nms_mode='none')
 test_evaluator = val_evaluator
+
+# fp16 settings
+fp16 = dict(loss_scale='dynamic')
