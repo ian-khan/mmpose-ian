@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from mmengine.model import BaseModule
 
 def is_power_of_2(number: int) -> bool:
     """Check whether `number` is power of 2.
@@ -56,6 +57,12 @@ class ConvStep(nn.Module):
 
 
 class ResidualStepsBlock(nn.Module):
+    """
+    Reimplementation of MMPose's Residual Step Block (RSB).
+    When there is mismatch between the shapes of input and output feature maps,
+    a convolution-normalization module is created on the skip connection to make them match.
+    The final activation is applied after convergence of the 2 paths.
+    """
     def __init__(self,
                  in_channels: int,
                  out_channels: int,
@@ -66,8 +73,7 @@ class ResidualStepsBlock(nn.Module):
         super().__init__()
 
         div, mod = divmod(in_channels, base_channels)
-        assert is_power_of_2(div) and mod == 0, "in_channels / base_channel must be power of 2."
-
+        assert mod == 0, "in_channels should be some multiple of base_channel."
         assert n_branches >= 1, "There should be at least one branch."
 
         self.in_channels = in_channels
@@ -106,7 +112,6 @@ class ResidualStepsBlock(nn.Module):
                           kernel_size=1,
                           stride=stride),
                 nn.BatchNorm2d(self.out_channels),
-                nn.ReLU(inplace=False),
             )
         self.converged_act = nn.ReLU(inplace=False)
 
@@ -133,4 +138,35 @@ class ResidualStepsBlock(nn.Module):
 
         x = x + skip
         x = self.converged_act(x)
+        return x
+
+
+class DownsampleLayer(BaseModule):
+    def __init__(self,
+                 block: nn.Module,
+                 n_blocks: int,
+                 in_channels: int,
+                 out_channels: int,
+                 base_channels: int = 64,
+                 base_branch_channels: int = 26,
+                 n_branches: int = 4,
+                 stride: int = 1,):
+        super().__init__()
+
+        self.blocks = nn.Sequential()
+        for i in range(n_blocks):
+            # The first block in a layer is responsible for
+            # channel expansion and down sampling.
+            _in_channels = in_channels if i == 0 else out_channels
+            _stride = stride if i == 0 else 1
+            _block = block(in_channels=_in_channels,
+                           out_channels=out_channels,
+                           base_channels=base_channels,
+                           base_branch_channels=base_branch_channels,
+                           n_branches=n_branches,
+                           stride=_stride,)
+            self.blocks.append(_block)
+
+    def forward(self, x):
+        x = self.blocks(x)
         return x
