@@ -28,15 +28,15 @@ def is_power_of_2(number: int) -> bool:
 class ConvStep(nn.Module):
     """A minimal Conv–Norm–Act step used in Residual Step Block (RSB).
 
-        Args:
-            in_channels (int): Number of input channels.
-            out_channels (int): Number of output channels.
-            kernel_size (int): Convolution kernel size. Default: 3.
-            stride (int): Convolution stride. Default: 1.
-            padding (int): Convolution padding. Default: 1.
-            norm_layer (nn.Module): Normalization layer class. Default: nn.BatchNorm2d.
-            act_layer (nn.Module): Activation layer class. Default: nn.ReLU.
-            inplace (bool): Whether to use inplace activation (if supported). Default: False.
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        kernel_size (int): Convolution kernel size. Default: 3.
+        stride (int): Convolution stride. Default: 1.
+        padding (int): Convolution padding. Default: 1.
+        norm_layer (nn.Module): Normalization layer class. Default: nn.BatchNorm2d.
+        act_layer (nn.Module): Activation layer class. Default: nn.ReLU.
+        inplace (bool): Whether to use inplace activation (if supported). Default: False.
     """
     def __init__(self,
                  in_channels: int,
@@ -73,17 +73,18 @@ class ConvStep(nn.Module):
 class ResidualStepsBlock(nn.Module):
     """
     Reimplementation of MMPose's Residual Step Block (RSB).
+
     When there is mismatch between the shapes of input and output feature maps,
     a convolution-normalization module is created on the skip connection to make them match.
     The final activation is applied after convergence of the 2 paths.
 
-        Args:
-            in_channels (int): Number of input channels. Derived.
-            out_channels (int): Number of output channels. Derived.
-            stride (int): The stride of the block. Derived.
-            base_in_channels (int): the input channels in the first layer. Default: 64.
-            base_branch_channels (int): the branch channels in the first layer. Default: 26.
-            n_branches (int): the number of branches. Default: 4.
+    Args:
+        in_channels (int): Number of input channels. Derived.
+        out_channels (int): Number of output channels. Derived.
+        stride (int): The stride of the block. Derived.
+        base_in_channels (int): the input channels in the first layer. Default: 64.
+        base_branch_channels (int): the branch channels in the first layer. Default: 26.
+        n_branches (int): the number of branches. Default: 4.
     """
     def __init__(self,
                  in_channels: int,
