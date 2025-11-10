@@ -10,6 +10,20 @@ def is_power_of_2(number: int) -> bool:
     assert number > 0, "Number must be positive."
     return number & (number - 1) == 0
 
+# In a hierarchical neural network structure, the basic module on each level is represented by a class.
+# Instances of a child module are created inside an instance of the parent module.
+
+# Derived parameters of a module are those derived from the parameters its parent module.
+# Their values vary across instances, and are derived during runtime.
+# Therefore, they are set as positional parameters.
+
+# Propagated parameters of a module are those copied from the corresponding parameters of its parent module.
+# Their values are the same across instances, and do not have the derivation process.
+# Therefore, they are set as keyword parameters with default values.
+
+# A module also has the propagating parameter, which comes from its parent and goes to child.
+# It adopts the form of a config dict, which nests the config dicts of the descendants.
+# It is unpacked and passed to the constructor of its direct child.
 
 class ConvStep(nn.Module):
     """A minimal Conv–Norm–Act step used in Residual Step Block (RSB).
@@ -62,19 +76,30 @@ class ResidualStepsBlock(nn.Module):
     When there is mismatch between the shapes of input and output feature maps,
     a convolution-normalization module is created on the skip connection to make them match.
     The final activation is applied after convergence of the 2 paths.
+
+        Args:
+            in_channels (int): Number of input channels. Derived.
+            out_channels (int): Number of output channels. Derived.
+            stride (int): The stride of the block. Derived.
+            base_in_channels (int): the input channels in the first layer. Default: 64.
+            base_branch_channels (int): the branch channels in the first layer. Default: 26.
+            n_branches (int): the number of branches. Default: 4.
     """
     def __init__(self,
                  in_channels: int,
                  out_channels: int,
-                 base_channels: int=64,
+                 stride: int,
+                 base_in_channels: int=64,
                  base_branch_channels: int=26,
                  n_branches: int=4,
-                 stride: int=1,):
+                 step_cfg: dict = None):
         super().__init__()
 
-        div, mod = divmod(in_channels, base_channels)
+        div, mod = divmod(in_channels, base_in_channels)
         assert mod == 0, "in_channels should be some multiple of base_channel."
         assert n_branches >= 1, "There should be at least one branch."
+
+        self.step_cfg = step_cfg or {}
 
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -86,7 +111,8 @@ class ResidualStepsBlock(nn.Module):
             nn.Conv2d(in_channels=self.in_channels,
                       out_channels = self.n_branches * self.branch_channels,
                       kernel_size=1,
-                      stride=stride,),
+                      stride=stride,
+                      bias=False),
             nn.BatchNorm2d(self.n_branches * self.branch_channels),
             nn.ReLU(inplace=False),
         )
@@ -96,12 +122,14 @@ class ResidualStepsBlock(nn.Module):
             for s in range(self.n_branches):
                 self.branched_steps[b].append(
                     ConvStep(in_channels=self.branch_channels,
-                             out_channels=self.branch_channels,)
+                             out_channels=self.branch_channels,
+                             **self.step_cfg)
                 )
         self.stem_converge = nn.Sequential(
             nn.Conv2d(in_channels=self.n_branches * self.branch_channels,
                       out_channels=self.out_channels,
-                      kernel_size=1,),
+                      kernel_size=1,
+                      bias=False),
             nn.BatchNorm2d(self.out_channels),
         )
         self.skip_connection = None
@@ -110,7 +138,8 @@ class ResidualStepsBlock(nn.Module):
                 nn.Conv2d(in_channels=self.in_channels,
                           out_channels=self.out_channels,
                           kernel_size=1,
-                          stride=stride),
+                          stride=stride,
+                          bias=False),
                 nn.BatchNorm2d(self.out_channels),
             )
         self.converged_act = nn.ReLU(inplace=False)
@@ -143,15 +172,17 @@ class ResidualStepsBlock(nn.Module):
 
 class DownsampleLayer(BaseModule):
     def __init__(self,
-                 block: nn.Module,
-                 n_blocks: int,
                  in_channels: int,
                  out_channels: int,
-                 base_channels: int = 64,
-                 base_branch_channels: int = 26,
-                 n_branches: int = 4,
-                 stride: int = 1,):
+                 stride: int,
+                 n_blocks: int,
+                 block: nn.Module = ResidualStepsBlock,
+                 block_cfg: dict = None):
         super().__init__()
+
+        assert n_blocks >= 1, "There should be at least one block."
+
+        self.block_cfg = block_cfg or {}
 
         self.blocks = nn.Sequential()
         for i in range(n_blocks):
@@ -161,10 +192,8 @@ class DownsampleLayer(BaseModule):
             _stride = stride if i == 0 else 1
             _block = block(in_channels=_in_channels,
                            out_channels=out_channels,
-                           base_channels=base_channels,
-                           base_branch_channels=base_branch_channels,
-                           n_branches=n_branches,
-                           stride=_stride,)
+                           stride=_stride,
+                           **self.block_cfg)
             self.blocks.append(_block)
 
     def forward(self, x):
