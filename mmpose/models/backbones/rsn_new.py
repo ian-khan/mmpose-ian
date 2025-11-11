@@ -1,3 +1,6 @@
+from collections.abc import Sequence
+from typing import Optional
+
 import torch
 from torch import nn
 from mmengine.model import BaseModule
@@ -82,8 +85,8 @@ class ResidualStepsBlock(nn.Module):
         in_channels (int): Number of input channels. Derived.
         out_channels (int): Number of output channels. Derived.
         stride (int): The stride of the block. Derived.
-        base_in_channels (int): the input channels in the first layer. Default: 64.
-        base_branch_channels (int): the branch channels in the first layer. Default: 26.
+        base_in_channels (int): base input channels of the first layer. Default: 64.
+        base_branch_channels (int): base branch channels of the first layer. Default: 26.
         n_branches (int): the number of branches. Default: 4.
     """
     def __init__(self,
@@ -200,3 +203,44 @@ class DownsampleLayer(BaseModule):
     def forward(self, x):
         x = self.blocks(x)
         return x
+
+
+class DownsampleModule(BaseModule):
+    def __init__(self,
+                 in_channels: int,
+                 n_blocks: Sequence[int],
+                 has_skip: bool = False,
+                 layer_cfg: dict = None,):
+        super().__init__()
+
+        assert len(n_blocks) >= 1, "There should be at least one layer"
+        self.n_layers = len(n_blocks)
+
+        self.layer_cfg = layer_cfg or {}
+
+        self.has_skip = has_skip
+
+        self.layers = nn.ModuleList()
+        for i in range(self.n_layers):
+            _in_channels = in_channels if i == 0 else in_channels * pow(2, i-1)
+            _out_channels = in_channels if i == 0 else in_channels * pow(2, i)  # intentionally verbose
+            _stride = 1 if i == 0 else 2
+            _n_blocks = n_blocks[i]
+            layer = DownsampleLayer(in_channels=_in_channels,
+                                    out_channels=_out_channels,
+                                    stride=_stride,
+                                    n_blocks=_n_blocks,
+                                    **self.layer_cfg)
+            self.layers.append(layer)
+
+    def forward(self,
+                x: torch.Tensor,
+                skip1: Optional[Sequence[torch.Tensor]] = None,
+                skip2: Optional[Sequence[torch.Tensor]] = None) -> tuple[torch.Tensor]:
+        downsample_out = list()
+        for i in range(self.n_layers):
+            x = self.layers[i](x)
+            x = x if not self.has_skip else x + skip1[i] + skip2[i]
+            downsample_out.append(x)
+        downsample_out.reverse()
+        return tuple(downsample_out)
