@@ -182,6 +182,7 @@ class DownsampleLayer(BaseModule):
                  stride: int,
                  n_blocks: int,
                  block: nn.Module = ResidualStepsBlock,
+                 has_cross_stage_skip: bool = False,
                  block_cfg: dict = None):
         super().__init__()
 
@@ -201,9 +202,42 @@ class DownsampleLayer(BaseModule):
                            **self.block_cfg)
             self.blocks.append(_block)
 
-    def forward(self, x):
-        x = self.blocks(x)
-        return x
+        self.has_cross_stage_skip = has_cross_stage_skip
+        if self.has_cross_stage_skip:
+            self.dl_skip_connection = nn.Sequential(
+                nn.Conv2d(in_channels=out_channels,
+                          out_channels=out_channels,
+                          kernel_size=1,
+                          stride=1,
+                          padding=0,
+                          bias=False),
+                nn.BatchNorm2d(out_channels),
+                nn.ReLU(inplace=False),
+            )
+
+    def forward(self,
+                dl_out: torch.Tensor,
+                dl_skip: torch.Tensor = None,
+                ul_skip: torch.Tensor = None, ) -> tuple:
+        """
+        Forward pass. Tensors not prefixed with underscores are inputs;
+        tensors prefixed with underscores are outputs;
+
+        Args:
+            dl_out: Feature map from the previous down-sampling layer.
+            dl_skip: Feature map from down-sampling layer in the previous stage.
+            ul_skip: Feature map from up-sampling layer in the previous stage.
+
+        Returns: Output and skip connection from this down-sampling layer.
+
+        """
+        _dl_out = self.blocks(dl_out)
+        if self.has_cross_stage_skip:
+            _dl_out = _dl_out + dl_skip + ul_skip
+
+        _dl_skip = self.dl_skip_connection(_dl_out) if self.has_cross_stage_skip else None
+
+        return _dl_out, _dl_skip
 
 
 class DownsampleModule(BaseModule):
@@ -211,13 +245,13 @@ class DownsampleModule(BaseModule):
                  in_channels: int,
                  n_blocks: Sequence[int],
                  has_skip: bool = False,
-                 layer_cfg: dict = None,):
+                 down_layer_cfg: dict = None, ):
         super().__init__()
 
         assert len(n_blocks) >= 1, "There should be at least one layer"
         self.n_layers = len(n_blocks)
 
-        self.layer_cfg = layer_cfg or {}
+        self.layer_cfg = down_layer_cfg or {}
 
         self.has_skip = has_skip
 
@@ -260,7 +294,7 @@ class UpsampleLayer(BaseModule):
         self.has_cross_stage_skip = has_cross_stage_skip
 
         # Not activated until converged
-        self.dl_out_projection = nn.Sequential(
+        self.dl_projection = nn.Sequential(
             nn.Conv2d(in_channels=dl_out_channels,
                       out_channels=ul_out_channels,
                       kernel_size=1,
@@ -272,7 +306,7 @@ class UpsampleLayer(BaseModule):
 
         # Not activated until converged
         if not is_first_layer:
-            self.ul_out_projection = nn.Sequential(
+            self.ul_projection = nn.Sequential(
                 nn.Conv2d(in_channels=ul_out_channels,
                           out_channels=ul_out_channels,
                           kernel_size=1,
@@ -285,19 +319,8 @@ class UpsampleLayer(BaseModule):
         self.converged_act = nn.ReLU(inplace=False)
 
         # Skip connections are activated then added to dls' output
-        if has_cross_stage_skip:
-            self.dl_out_skip = nn.Sequential(
-                nn.Conv2d(in_channels=dl_out_channels,
-                          out_channels=dl_out_channels,
-                          kernel_size=1,
-                          stride=1,
-                          padding=0,
-                          bias=False),
-                nn.BatchNorm2d(dl_out_channels),
-                nn.ReLU(inplace=False)
-            )
-
-            self.out_skip = nn.Sequential(
+        if self.has_cross_stage_skip:
+            self.ul_skip_connection = nn.Sequential(
                 nn.Conv2d(in_channels=ul_out_channels,
                           out_channels=dl_out_channels,
                           kernel_size=1,
@@ -308,26 +331,92 @@ class UpsampleLayer(BaseModule):
                 nn.ReLU(inplace=False)
             )
 
-    def forward(self, dl_out: torch.Tensor, ul_out: Optional[torch.Tensor]) -> tuple:
+    def forward(self,
+                dl_out: torch.Tensor,
+                ul_out: Optional[torch.Tensor] = None) -> tuple:
         """
+        Forward pass. Tensors not prefixed with underscores are inputs;
+        tensors prefixed with underscores are outputs;
 
         Args:
-            dl_out: The feature map output from the down-sampling layer with the same output resolution.
-            ul_out: The feature map output from the previous up-sampling layer.
+            dl_out: Feature map from the down-sampling layer on same level in this stage.
+            ul_out: Feature map from the previous up-sampling layer.
 
-        Returns: The output of this ul; Two skip connections to add to output of dl in the next stage of same out reso.
+        Returns: Output and skip connection from this up-sampling layer.
 
         """
-        out = self.dl_out_projection(dl_out)
+        _ul_out = self.dl_projection(dl_out)
         if not self.is_first_layer:
             ul_out = F.interpolate(ul_out,
                                    scale_factor=2,
                                    mode='bilinear',
                                    align_corners=True)
-            out = out + self.ul_out_projection(ul_out)
-        out = self.converged_act(out)
+            _ul_out = _ul_out + self.ul_projection(ul_out)
+        _ul_out = self.converged_act(_ul_out)
 
-        skip1 = self.dl_out_skip(dl_out) if self.has_cross_stage_skip else None
-        skip2 = self.out_skip(out) if self.has_cross_stage_skip else None
+        _ul_skip = self.ul_skip_connection(_ul_out) if self.has_cross_stage_skip else None
 
-        return out, skip1, skip2
+        return _ul_out, _ul_skip
+
+
+class ResidualStepsNetworkStage(nn.Module):
+    def __init__(self,
+                 in_channels: int,
+                 n_blocks: Sequence[int],
+                 down_layer_cfg: dict = None,
+                 up_layer_cfg: dict = None,):
+        super().__init__()
+
+        self.n_levels = len(n_blocks)
+        assert self.n_levels > 0, "There must be at least one level of resolution."
+
+        down_layer_cfg = down_layer_cfg.copy() if down_layer_cfg is not None else {}
+        up_layer_cfg = up_layer_cfg.copy() if up_layer_cfg is not None else {}
+
+        self.down_layers = list()
+        self.up_layers = list()
+        for i in range(self.n_levels):
+            dl_in_channels = in_channels if i == 0 else in_channels * pow(2, i-1)
+            dl_out_channels = in_channels if i == 0 else in_channels * pow(2, i)
+            stride = 1 if i == 0 else 2
+            is_first_layer = i == self.n_levels - 1  # self.up_layers is later reversed
+            self.down_layers.append(DownsampleLayer(in_channels=dl_in_channels,
+                                                    out_channels=dl_out_channels,
+                                                    stride=stride,
+                                                    n_blocks=n_blocks[i],
+                                                    **down_layer_cfg))
+            self.up_layers.append(UpsampleLayer(dl_out_channels=dl_out_channels,
+                                                is_first_layer=is_first_layer,
+                                                **up_layer_cfg))
+        self.up_layers.reverse()
+
+    def forward(self,
+                x: torch.Tensor,
+                dl_skips: Optional[Sequence[torch.Tensor]] = None,
+                ul_skips: Optional[Sequence[torch.Tensor]] = None) -> tuple:
+        assert not ((dl_skips is None) ^ (ul_skips is None)), \
+            ("Skip connections from the down-sampling layers and the up-sampling layers"
+             "should be given at the same time.")
+
+        _dl_out = x
+        _dl_outs = list()
+        _ul_out = None
+        _dl_skips = list()
+        _ul_skips = list()
+
+        for i in range(self.n_levels):
+            _dl_out, _dl_skip = self.down_layers[i](dl_out=_dl_out,
+                                                    dl_skip=dl_skips[i],
+                                                    ul_skip=ul_skips[i])
+            _dl_outs.append(_dl_out)
+            _dl_skips.append(_dl_skip)
+        _dl_outs.reverse()
+
+        for i in range(self.n_levels):
+            _ul_out, _ul_skip = self.up_layers[i](dl_out=_dl_outs[i],
+                                                  ul_out=_ul_out)
+            _ul_skips.append(_ul_skip)
+        _ul_skips.reverse()
+
+        return _ul_out, _dl_skips, _ul_skips
+
