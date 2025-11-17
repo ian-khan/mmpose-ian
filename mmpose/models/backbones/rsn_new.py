@@ -22,6 +22,30 @@ from mmengine.model import BaseModule
 # It adopts the form of a config dict, which nests the config dicts of the descendants.
 # It is unpacked and passed to the constructor of its direct child.
 
+class Stem(nn.Module):
+    def __init__(self,
+                 stage_in_channels: int=64,
+                 **kwargs):
+        super().__init__()
+        self.stem = nn.Sequential(
+            nn.Conv2d(in_channels=3,
+                      out_channels=stage_in_channels,
+                      kernel_size=7,
+                      stride=2,
+                      padding=3,
+                      bias=False),
+            nn.BatchNorm2d(stage_in_channels),
+            nn.ReLU(inplace=False),
+            nn.MaxPool2d(kernel_size=3,
+                         stride=2,
+                         padding=1)
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.stem(x)
+        return x
+
+
 class ConvStep(nn.Module):
     """A minimal Conv–Norm–Act step used in Residual Step Block (RSB).
 
@@ -99,7 +123,7 @@ class ResidualStepsBlock(nn.Module):
         assert mod == 0, "in_channels should be some multiple of base_channel."
         assert n_branches >= 1, "There should be at least one branch."
 
-        cfg = copy.deepcopy(cfg) or {}
+        cfg = cfg or {}
 
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -176,6 +200,7 @@ class DownsampleLayer(BaseModule):
                  out_channels: int,
                  stride: int,
                  n_blocks: int,
+                 in_first_stage: bool,
                  in_final_stage: bool,
                  block: nn.Module = ResidualStepsBlock,
                  enable_stage_skip: bool = False,  # False for debug convenience
@@ -185,7 +210,7 @@ class DownsampleLayer(BaseModule):
 
         assert n_blocks >= 1, "There should be at least one block."
 
-        cfg = copy.deepcopy(cfg) or {}
+        cfg = cfg or {}
 
         self.blocks = nn.Sequential()
         for i in range(n_blocks):
@@ -199,9 +224,9 @@ class DownsampleLayer(BaseModule):
                            **cfg)
             self.blocks.append(_block)
 
-        self.enable_stage_skip = enable_stage_skip
-        self.generate_out_skip = enable_stage_skip and not in_final_stage
-        if self.generate_out_skip:
+        self.receive_in_skip = enable_stage_skip and not in_first_stage
+        self.compute_out_skip = enable_stage_skip and not in_final_stage
+        if self.compute_out_skip:
             self.dl_skip_connection = nn.Sequential(
                 nn.Conv2d(in_channels=out_channels,
                           out_channels=out_channels,
@@ -230,10 +255,10 @@ class DownsampleLayer(BaseModule):
 
         """
         _dl_out = self.blocks(dl_out)
-        if self.enable_stage_skip:
+        if self.receive_in_skip:
             _dl_out = _dl_out + dl_skip + ul_skip
 
-        _dl_skip = self.dl_skip_connection(_dl_out) if self.generate_out_skip else None
+        _dl_skip = self.dl_skip_connection(_dl_out) if self.compute_out_skip else None
 
         return _dl_out, _dl_skip
 
@@ -249,7 +274,7 @@ class UpsampleLayer(BaseModule):
         super().__init__()
 
         self.is_first_layer = is_first_layer
-        self.generate_out_skip = enable_stage_skip and not in_final_stage
+        self.compute_out_skip = enable_stage_skip and not in_final_stage
 
         # Not activated until fused
         self.dl_projection = nn.Sequential(
@@ -277,7 +302,7 @@ class UpsampleLayer(BaseModule):
         self.fused_act = nn.ReLU(inplace=False)
 
         # Skip connections are activated then added to DLs' output
-        if self.generate_out_skip:
+        if self.compute_out_skip:
             self.ul_skip_connection = nn.Sequential(
                 nn.Conv2d(in_channels=ul_out_channels,
                           out_channels=dl_out_channels,
@@ -312,7 +337,7 @@ class UpsampleLayer(BaseModule):
             _ul_out = _ul_out + self.ul_projection(ul_out)
         _ul_out = self.fused_act(_ul_out)
 
-        _ul_skip = self.ul_skip_connection(_ul_out) if self.generate_out_skip else None
+        _ul_skip = self.ul_skip_connection(_ul_out) if self.compute_out_skip else None
 
         return _ul_out, _ul_skip
 
@@ -320,6 +345,7 @@ class UpsampleLayer(BaseModule):
 class ResidualStepsNetworkStage(nn.Module):
     def __init__(self,
                  n_blocks: Sequence[int],
+                 is_first_stage: bool,
                  is_final_stage: bool,
                  stage_in_channels: int=64,
                  cfg: dict = None,
@@ -329,9 +355,11 @@ class ResidualStepsNetworkStage(nn.Module):
         self.n_levels = len(n_blocks)
         assert self.n_levels > 0, "There must be at least one level of resolution."
 
-        cfg = copy.deepcopy(cfg) or None
+        cfg = cfg or None
 
-        self.down_layers = list()
+        self.is_first_stage = is_first_stage
+
+        self.down_layers = nn.ModuleList()
         self.up_layers = list()
         for i in range(self.n_levels):
             dl_in_channels = stage_in_channels if i == 0 else stage_in_channels * pow(2, i - 1)
@@ -342,6 +370,7 @@ class ResidualStepsNetworkStage(nn.Module):
                                                     out_channels=dl_out_channels,
                                                     stride=stride,
                                                     n_blocks=n_blocks[i],
+                                                    in_first_stage=is_first_stage,
                                                     in_final_stage=is_final_stage,
                                                     cfg=cfg,
                                                     **cfg))
@@ -350,6 +379,7 @@ class ResidualStepsNetworkStage(nn.Module):
                                                 in_final_stage=is_final_stage,
                                                 **cfg))
         self.up_layers.reverse()
+        self.up_layers = nn.ModuleList(self.up_layers)
 
     def forward(self,
                 x: torch.Tensor,
@@ -367,8 +397,8 @@ class ResidualStepsNetworkStage(nn.Module):
 
         for i in range(self.n_levels):
             _dl_out, _dl_skip = self.down_layers[i](dl_out=_dl_out,
-                                                    dl_skip=dl_skips[i],
-                                                    ul_skip=ul_skips[i])
+                                                    dl_skip=None if self.is_first_stage else dl_skips[i],
+                                                    ul_skip=None if self.is_first_stage else ul_skips[i])
             _dl_outs.append(_dl_out)
             _dl_skips.append(_dl_skip)
         _dl_outs.reverse()
@@ -380,30 +410,6 @@ class ResidualStepsNetworkStage(nn.Module):
         _ul_skips.reverse()
 
         return _ul_out, _dl_skips, _ul_skips
-
-
-class Stem(nn.Module):
-    def __init__(self,
-                 stage_in_channels: int=64,
-                 **kwargs):
-        super().__init__()
-        self.stem = nn.Sequential(
-            nn.Conv2d(in_channels=3,
-                      out_channels=stage_in_channels,
-                      kernel_size=7,
-                      stride=2,
-                      padding=3,
-                      bias=False),
-            nn.BatchNorm2d(stage_in_channels),
-            nn.ReLU(inplace=False),
-            nn.MaxPool2d(kernel_size=3,
-                         stride=2,
-                         padding=1)
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.stem(x)
-        return x
 
 
 class InterstageTransition(nn.Module):
@@ -426,3 +432,48 @@ class InterstageTransition(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.transition(x)
         return x
+
+
+class ResidualStepsNetwork(nn.Module):
+    def __init__(self,
+                 stage_layer_blocks: Sequence[Sequence[int]],
+                 cfg: dict = None, ):
+        super().__init__()
+
+        cfg = copy.deepcopy(cfg) or {}
+
+        self.n_stages = len(stage_layer_blocks)
+
+        self.stem = Stem(**cfg)
+
+        self.stages = nn.ModuleList()
+        for i in range(self.n_stages):
+            is_first_stage = i == 0
+            is_final_stage = i == self.n_stages - 1
+            stage = ResidualStepsNetworkStage(n_blocks=stage_layer_blocks[i],
+                                              is_first_stage=is_first_stage,
+                                              is_final_stage=is_final_stage,
+                                              cfg=cfg,
+                                              **cfg)
+            self.stages.append(stage)
+
+        self.transitions = nn.ModuleList()
+        for i in range(self.n_stages-1):
+            transition = InterstageTransition(**cfg)
+            self.transitions.append(transition)
+
+
+    def forward(self, x: torch.Tensor) -> tuple:
+        x = self.stem(x)
+
+        dl_skips = None
+        ul_skips = None
+        stage_outs = list()
+        for i in range(self.n_stages):
+            x, dl_skips, ul_skips = self.stages[i](x, dl_skips, ul_skips)
+            stage_outs.append(x)
+            if i < self.n_stages - 1:
+                x = self.transitions[i](x)
+
+        return tuple(stage_outs)
+

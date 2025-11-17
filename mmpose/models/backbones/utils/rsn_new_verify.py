@@ -1,8 +1,13 @@
-from mmpose.models.backbones.rsn_new import (ConvStep,
+# Sanity check for reimplemented RSN classes
+
+from mmpose.models.backbones.rsn_new import (Stem,
+                                             ConvStep,
                                              ResidualStepsBlock,
-                                             DownsampleLayer, UpsampleLayer,
+                                             DownsampleLayer,
+                                             UpsampleLayer,
                                              ResidualStepsNetworkStage,
-                                             Stem, InterstageTransition)
+                                             InterstageTransition,
+                                             ResidualStepsNetwork)
 import torch
 
 stem = Stem(stage_in_channels=64)
@@ -14,6 +19,7 @@ dl = DownsampleLayer(in_channels=64,
                      out_channels=128,  # layer 1
                      stride=2,
                      n_blocks=2,
+                     in_first_stage=False,
                      in_final_stage=False)
 dl_input = torch.randn((10, 64, 64, 48))
 dl_output, dl_skip = dl(dl_input)
@@ -32,6 +38,7 @@ cfg = dict(
     enable_stage_skip=True,
 )
 stage = ResidualStepsNetworkStage([2, 2, 6, 2],
+                                  is_first_stage=False,
                                   is_final_stage=False,
                                   cfg=cfg,
                                   **cfg)
@@ -50,3 +57,13 @@ transition = InterstageTransition(stage_out_channels=256,
 transition_input = torch.randn(10, 256, 64, 48)
 transition_output = transition(transition_input)
 print("\nTransition output: ", transition_output.shape)  # (10, 64, 64, 48)
+
+rsn = ResidualStepsNetwork(stage_layer_blocks=[[2, 2, 6, 2],
+                                               [2, 2, 6, 2],
+                                               [2, 2, 6, 2],],
+                           cfg=cfg,)
+rsn_input = torch.randn(10, 3, 256, 192)
+rsn_output = rsn(rsn_input)
+print("\n")
+for i in range(3):
+    print(f"RSN stage #{i} output: ", rsn_output[i].shape)  # all (10, 256, 64, 48)
