@@ -176,8 +176,9 @@ class DownsampleLayer(BaseModule):
                  out_channels: int,
                  stride: int,
                  n_blocks: int,
+                 in_final_stage: bool,
                  block: nn.Module = ResidualStepsBlock,
-                 has_cross_stage_skip: bool = False,
+                 enable_stage_skip: bool = False,  # False for debug convenience
                  cfg: dict = None,
                  **kwargs):
         super().__init__()
@@ -198,8 +199,9 @@ class DownsampleLayer(BaseModule):
                            **cfg)
             self.blocks.append(_block)
 
-        self.has_cross_stage_skip = has_cross_stage_skip
-        if self.has_cross_stage_skip:
+        self.enable_stage_skip = enable_stage_skip
+        self.generate_out_skip = enable_stage_skip and not in_final_stage
+        if self.generate_out_skip:
             self.dl_skip_connection = nn.Sequential(
                 nn.Conv2d(in_channels=out_channels,
                           out_channels=out_channels,
@@ -228,10 +230,10 @@ class DownsampleLayer(BaseModule):
 
         """
         _dl_out = self.blocks(dl_out)
-        if self.has_cross_stage_skip:
+        if self.enable_stage_skip:
             _dl_out = _dl_out + dl_skip + ul_skip
 
-        _dl_skip = self.dl_skip_connection(_dl_out) if self.has_cross_stage_skip else None
+        _dl_skip = self.dl_skip_connection(_dl_out) if self.generate_out_skip else None
 
         return _dl_out, _dl_skip
 
@@ -240,15 +242,16 @@ class UpsampleLayer(BaseModule):
     def __init__(self,
                  dl_out_channels: int,
                  is_first_layer: bool,
-                 has_cross_stage_skip: bool=False,
-                 ul_out_channels: int=256,
+                 in_final_stage: bool,
+                 ul_out_channels: int = 256,
+                 enable_stage_skip: bool=False,  # False for debug convenience
                  **kwargs):
         super().__init__()
 
         self.is_first_layer = is_first_layer
-        self.has_cross_stage_skip = has_cross_stage_skip
+        self.generate_out_skip = enable_stage_skip and not in_final_stage
 
-        # Not activated until converged
+        # Not activated until fused
         self.dl_projection = nn.Sequential(
             nn.Conv2d(in_channels=dl_out_channels,
                       out_channels=ul_out_channels,
@@ -259,7 +262,7 @@ class UpsampleLayer(BaseModule):
             nn.BatchNorm2d(ul_out_channels)
         )
 
-        # Not activated until converged
+        # Not activated until fused
         if not is_first_layer:
             self.ul_projection = nn.Sequential(
                 nn.Conv2d(in_channels=ul_out_channels,
@@ -271,10 +274,10 @@ class UpsampleLayer(BaseModule):
                 nn.BatchNorm2d(ul_out_channels)
             )
 
-        self.converged_act = nn.ReLU(inplace=False)
+        self.fused_act = nn.ReLU(inplace=False)
 
-        # Skip connections are activated then added to dls' output
-        if self.has_cross_stage_skip:
+        # Skip connections are activated then added to DLs' output
+        if self.generate_out_skip:
             self.ul_skip_connection = nn.Sequential(
                 nn.Conv2d(in_channels=ul_out_channels,
                           out_channels=dl_out_channels,
@@ -307,17 +310,18 @@ class UpsampleLayer(BaseModule):
                                    mode='bilinear',
                                    align_corners=True)
             _ul_out = _ul_out + self.ul_projection(ul_out)
-        _ul_out = self.converged_act(_ul_out)
+        _ul_out = self.fused_act(_ul_out)
 
-        _ul_skip = self.ul_skip_connection(_ul_out) if self.has_cross_stage_skip else None
+        _ul_skip = self.ul_skip_connection(_ul_out) if self.generate_out_skip else None
 
         return _ul_out, _ul_skip
 
 
 class ResidualStepsNetworkStage(nn.Module):
     def __init__(self,
-                 in_channels: int,
                  n_blocks: Sequence[int],
+                 is_final_stage: bool,
+                 stage_in_channels: int=64,
                  cfg: dict = None,
                  **kwargs):
         super().__init__()
@@ -330,18 +334,20 @@ class ResidualStepsNetworkStage(nn.Module):
         self.down_layers = list()
         self.up_layers = list()
         for i in range(self.n_levels):
-            dl_in_channels = in_channels if i == 0 else in_channels * pow(2, i-1)
-            dl_out_channels = in_channels if i == 0 else in_channels * pow(2, i)
+            dl_in_channels = stage_in_channels if i == 0 else stage_in_channels * pow(2, i - 1)
+            dl_out_channels = stage_in_channels if i == 0 else stage_in_channels * pow(2, i)
             stride = 1 if i == 0 else 2
             is_first_layer = i == self.n_levels - 1  # self.up_layers is later reversed
             self.down_layers.append(DownsampleLayer(in_channels=dl_in_channels,
                                                     out_channels=dl_out_channels,
                                                     stride=stride,
                                                     n_blocks=n_blocks[i],
+                                                    in_final_stage=is_final_stage,
                                                     cfg=cfg,
                                                     **cfg))
             self.up_layers.append(UpsampleLayer(dl_out_channels=dl_out_channels,
                                                 is_first_layer=is_first_layer,
+                                                in_final_stage=is_final_stage,
                                                 **cfg))
         self.up_layers.reverse()
 
@@ -355,8 +361,8 @@ class ResidualStepsNetworkStage(nn.Module):
 
         _dl_out = x
         _dl_outs = list()
-        _ul_out = None
         _dl_skips = list()
+        _ul_out = None
         _ul_skips = list()
 
         for i in range(self.n_levels):
