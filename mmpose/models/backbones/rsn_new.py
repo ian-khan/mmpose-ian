@@ -1,3 +1,4 @@
+import copy
 from collections.abc import Sequence
 from typing import Optional
 
@@ -5,14 +6,6 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from mmengine.model import BaseModule
-
-def is_power_of_2(number: int) -> bool:
-    """Check whether `number` is power of 2.
-    Args: `number`: the number to be checked.
-    Returns: `bool`
-    """
-    assert number > 0, "Number must be positive."
-    return number & (number - 1) == 0
 
 # In a hierarchical neural network structure, the basic module on each level is represented by a class.
 # Instances of a child module are created inside an instance of the parent module.
@@ -50,7 +43,8 @@ class ConvStep(nn.Module):
                  padding: int = 1,
                  norm_layer= nn.BatchNorm2d,
                  act_layer= nn.ReLU,
-                 inplace: bool = False):
+                 inplace: bool = False,
+                 **kwargs):
         super().__init__()
         # when normalization is present, bias in convolution is redundant
         bias = norm_layer is None
@@ -86,7 +80,7 @@ class ResidualStepsBlock(nn.Module):
         in_channels (int): Number of input channels. Derived.
         out_channels (int): Number of output channels. Derived.
         stride (int): The stride of the block. Derived.
-        base_in_channels (int): base input channels of the first layer. Default: 64.
+        stage_in_channels (int): base input channels of the first layer. Default: 64.
         base_branch_channels (int): base branch channels of the first layer. Default: 26.
         n_branches (int): the number of branches. Default: 4.
     """
@@ -94,17 +88,18 @@ class ResidualStepsBlock(nn.Module):
                  in_channels: int,
                  out_channels: int,
                  stride: int,
-                 base_in_channels: int=64,
+                 stage_in_channels: int=64,
                  base_branch_channels: int=26,
                  n_branches: int=4,
-                 step_cfg: dict = None):
+                 cfg: dict = None,
+                 **kwargs):
         super().__init__()
 
-        div, mod = divmod(in_channels, base_in_channels)
+        div, mod = divmod(in_channels, stage_in_channels)
         assert mod == 0, "in_channels should be some multiple of base_channel."
         assert n_branches >= 1, "There should be at least one branch."
 
-        self.step_cfg = step_cfg or {}
+        cfg = copy.deepcopy(cfg) or {}
 
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -128,7 +123,7 @@ class ResidualStepsBlock(nn.Module):
                 self.branched_steps[b].append(
                     ConvStep(in_channels=self.branch_channels,
                              out_channels=self.branch_channels,
-                             **self.step_cfg)
+                             **cfg)
                 )
         self.stem_converge = nn.Sequential(
             nn.Conv2d(in_channels=self.n_branches * self.branch_channels,
@@ -183,12 +178,13 @@ class DownsampleLayer(BaseModule):
                  n_blocks: int,
                  block: nn.Module = ResidualStepsBlock,
                  has_cross_stage_skip: bool = False,
-                 block_cfg: dict = None):
+                 cfg: dict = None,
+                 **kwargs):
         super().__init__()
 
         assert n_blocks >= 1, "There should be at least one block."
 
-        self.block_cfg = block_cfg or {}
+        cfg = copy.deepcopy(cfg) or {}
 
         self.blocks = nn.Sequential()
         for i in range(n_blocks):
@@ -199,7 +195,7 @@ class DownsampleLayer(BaseModule):
             _block = block(in_channels=_in_channels,
                            out_channels=out_channels,
                            stride=_stride,
-                           **self.block_cfg)
+                           **cfg)
             self.blocks.append(_block)
 
         self.has_cross_stage_skip = has_cross_stage_skip
@@ -240,54 +236,13 @@ class DownsampleLayer(BaseModule):
         return _dl_out, _dl_skip
 
 
-class DownsampleModule(BaseModule):
-    def __init__(self,
-                 in_channels: int,
-                 n_blocks: Sequence[int],
-                 has_skip: bool = False,
-                 down_layer_cfg: dict = None, ):
-        super().__init__()
-
-        assert len(n_blocks) >= 1, "There should be at least one layer"
-        self.n_layers = len(n_blocks)
-
-        self.layer_cfg = down_layer_cfg or {}
-
-        self.has_skip = has_skip
-
-        self.layers = nn.ModuleList()
-        for i in range(self.n_layers):
-            _in_channels = in_channels if i == 0 else in_channels * pow(2, i-1)
-            _out_channels = in_channels if i == 0 else in_channels * pow(2, i)  # intentionally verbose
-            _stride = 1 if i == 0 else 2
-            _n_blocks = n_blocks[i]
-            layer = DownsampleLayer(in_channels=_in_channels,
-                                    out_channels=_out_channels,
-                                    stride=_stride,
-                                    n_blocks=_n_blocks,
-                                    **self.layer_cfg)
-            self.layers.append(layer)
-
-    def forward(self,
-                x: torch.Tensor,
-                skip1: Optional[Sequence[torch.Tensor]] = None,
-                skip2: Optional[Sequence[torch.Tensor]] = None) -> tuple[torch.Tensor]:
-        downsample_out = list()
-        for i in range(self.n_layers):
-            x = self.layers[i](x)
-            x = x if not self.has_skip else x + skip1[i] + skip2[i]
-            downsample_out.append(x)
-        downsample_out.reverse()
-        return tuple(downsample_out)
-
-
 class UpsampleLayer(BaseModule):
     def __init__(self,
                  dl_out_channels: int,
                  is_first_layer: bool,
                  has_cross_stage_skip: bool=False,
                  ul_out_channels: int=256,
-                 ):
+                 **kwargs):
         super().__init__()
 
         self.is_first_layer = is_first_layer
@@ -363,15 +318,14 @@ class ResidualStepsNetworkStage(nn.Module):
     def __init__(self,
                  in_channels: int,
                  n_blocks: Sequence[int],
-                 down_layer_cfg: dict = None,
-                 up_layer_cfg: dict = None,):
+                 cfg: dict = None,
+                 **kwargs):
         super().__init__()
 
         self.n_levels = len(n_blocks)
         assert self.n_levels > 0, "There must be at least one level of resolution."
 
-        down_layer_cfg = down_layer_cfg.copy() if down_layer_cfg is not None else {}
-        up_layer_cfg = up_layer_cfg.copy() if up_layer_cfg is not None else {}
+        cfg = copy.deepcopy(cfg) or None
 
         self.down_layers = list()
         self.up_layers = list()
@@ -384,10 +338,11 @@ class ResidualStepsNetworkStage(nn.Module):
                                                     out_channels=dl_out_channels,
                                                     stride=stride,
                                                     n_blocks=n_blocks[i],
-                                                    **down_layer_cfg))
+                                                    cfg=cfg,
+                                                    **cfg))
             self.up_layers.append(UpsampleLayer(dl_out_channels=dl_out_channels,
                                                 is_first_layer=is_first_layer,
-                                                **up_layer_cfg))
+                                                **cfg))
         self.up_layers.reverse()
 
     def forward(self,
@@ -420,3 +375,48 @@ class ResidualStepsNetworkStage(nn.Module):
 
         return _ul_out, _dl_skips, _ul_skips
 
+
+class Stem(nn.Module):
+    def __init__(self,
+                 stage_in_channels: int=64,
+                 **kwargs):
+        super().__init__()
+        self.stem = nn.Sequential(
+            nn.Conv2d(in_channels=3,
+                      out_channels=stage_in_channels,
+                      kernel_size=7,
+                      stride=2,
+                      padding=3,
+                      bias=False),
+            nn.BatchNorm2d(stage_in_channels),
+            nn.ReLU(inplace=False),
+            nn.MaxPool2d(kernel_size=3,
+                         stride=2,
+                         padding=1)
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.stem(x)
+        return x
+
+
+class InterstageTransition(nn.Module):
+    def __init__(self,
+                 stage_out_channels: int=256,
+                 stage_in_channels: int=64,
+                 **kwargs):
+        super().__init__()
+        self.transition = nn.Sequential(
+            nn.Conv2d(in_channels=stage_out_channels,
+                      out_channels=stage_in_channels,
+                      kernel_size=1,
+                      stride=1,
+                      padding=0,
+                      bias=False),
+            nn.BatchNorm2d(stage_in_channels),
+            nn.ReLU(inplace=False),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.transition(x)
+        return x
