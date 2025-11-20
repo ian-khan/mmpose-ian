@@ -145,7 +145,7 @@ class ResidualStepsBlock(nn.Module):
         self.branched_steps = nn.ModuleList()
         for b in range(n_branches):
             self.branched_steps.append(nn.ModuleList())
-            for s in range(self.n_branches):
+            for s in range(b+1):
                 self.branched_steps[b].append(
                     ConvStep(in_channels=self.branch_channels,
                              out_channels=self.branch_channels,
@@ -357,7 +357,7 @@ class ResidualStepsNetworkStage(nn.Module):
         self.n_levels = len(n_blocks)
         assert self.n_levels > 0, "There must be at least one level of resolution."
 
-        cfg = cfg or None
+        cfg = cfg or {}
 
         self.is_first_stage = is_first_stage
 

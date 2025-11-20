@@ -31,15 +31,8 @@ default_hooks = dict(checkpoint=dict(interval=5, save_last=True,
                                      save_best='coco/AP', rule='greater'))
 
 # codec settings
-# multiple kernel_sizes of heatmap gaussian for 'Megvii' approach.
-kernel_sizes = [11, 9, 7, 5]
-codec = [
-    dict(
-        type='MegviiHeatmap',
-        input_size=(192, 256),
-        heatmap_size=(48, 64),
-        kernel_size=kernel_size) for kernel_size in kernel_sizes
-]
+codec = dict(
+    type='MSRAHeatmap', input_size=(192, 256), heatmap_size=(48, 64), sigma=2)
 
 # model settings
 model = dict(
@@ -55,8 +48,9 @@ model = dict(
     ),
     head=dict(
         type='HeatmapHead',
-        in_channels=1024,
+        in_channels=256,
         out_channels=17,
+        deconv_out_channels=(),
         loss=dict(type='KeypointMSELoss', use_target_weight=True),
         decoder=codec),
     test_cfg=dict(
@@ -77,15 +71,15 @@ train_pipeline = [
     dict(type='RandomFlip', direction='horizontal'),
     dict(type='RandomHalfBody'),
     dict(type='RandomBBoxTransform'),
-    dict(type='TopdownAffine', input_size=codec[0]['input_size']),
-    dict(type='GenerateTarget', multilevel=True, encoder=codec),
+    dict(type='TopdownAffine', input_size=codec['input_size']),
+    dict(type='GenerateTarget', encoder=codec),
     dict(type='PackPoseInputs')
 ]
 
 val_pipeline = [
     dict(type='LoadImage'),
     dict(type='GetBBoxCenterScale'),
-    dict(type='TopdownAffine', input_size=codec[0]['input_size']),
+    dict(type='TopdownAffine', input_size=codec['input_size']),
     dict(type='PackPoseInputs')
 ]
 
