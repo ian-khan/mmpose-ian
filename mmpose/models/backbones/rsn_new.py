@@ -1,7 +1,7 @@
 from mmpose.registry import MODELS
 
 import copy
-from typing import Sequence
+from typing import Sequence  # collections.abc.Sequence unavailable for Python <= 3.9
 from typing import Optional
 
 import torch
@@ -145,6 +145,7 @@ class ResidualStepsBlock(nn.Module):
         self.branched_steps = nn.ModuleList()
         for b in range(n_branches):
             self.branched_steps.append(nn.ModuleList())
+            # the b-th branch has b steps
             for s in range(b+1):
                 self.branched_steps[b].append(
                     ConvStep(in_channels=self.branch_channels,
@@ -205,7 +206,7 @@ class DownsampleLayer(BaseModule):
                  in_first_stage: bool,
                  in_final_stage: bool,
                  block: nn.Module = ResidualStepsBlock,
-                 enable_stage_skip: bool = True,  # False for debug convenience
+                 enable_stage_skip: bool = True,  # False for debug; True for deploy
                  cfg: dict = None,
                  **kwargs):
         super().__init__()
@@ -271,7 +272,7 @@ class UpsampleLayer(BaseModule):
                  is_first_layer: bool,
                  in_final_stage: bool,
                  ul_out_channels: int = 256,
-                 enable_stage_skip: bool=True,  # False for debug convenience
+                 enable_stage_skip: bool=True,  # False for debug; True for deploy
                  **kwargs):
         super().__init__()
 

@@ -27,7 +27,7 @@ param_scheduler = [
 auto_scale_lr = dict(base_batch_size=256)
 
 # hooks
-default_hooks = dict(checkpoint=dict(interval=10, max_keep_ckpts=10,
+default_hooks = dict(checkpoint=dict(interval=5, max_keep_ckpts=10,
                                      save_last=True,
                                      save_best='coco/AP', rule='greater'))
 
