@@ -350,6 +350,7 @@ class ResidualStepsNetworkStage(nn.Module):
                  n_blocks: Sequence[int],
                  is_first_stage: bool,
                  is_final_stage: bool,
+                 enable_layer_supervision: bool = True,
                  stage_in_channels: int=64,
                  cfg: dict = None,
                  **kwargs):
@@ -361,6 +362,7 @@ class ResidualStepsNetworkStage(nn.Module):
         cfg = cfg or {}
 
         self.is_first_stage = is_first_stage
+        self.enable_layer_supervision = enable_layer_supervision
 
         self.down_layers = nn.ModuleList()
         self.up_layers = list()
@@ -396,6 +398,7 @@ class ResidualStepsNetworkStage(nn.Module):
         _dl_outs = list()
         _dl_skips = list()
         _ul_out = None
+        _ul_outs = list() if self.enable_layer_supervision else None
         _ul_skips = list()
 
         for i in range(self.n_levels):
@@ -409,10 +412,13 @@ class ResidualStepsNetworkStage(nn.Module):
         for i in range(self.n_levels):
             _ul_out, _ul_skip = self.up_layers[i](dl_out=_dl_outs[i],
                                                   ul_out=_ul_out)
+            if self.enable_layer_supervision:
+                _ul_outs.append(_ul_out)
             _ul_skips.append(_ul_skip)
         _ul_skips.reverse()
 
-        return _ul_out, _dl_skips, _ul_skips
+        return (tuple(_ul_outs) if self.enable_layer_supervision else _ul_out,
+                _dl_skips, _ul_skips)
 
 
 class InterstageTransition(nn.Module):
@@ -441,12 +447,16 @@ class InterstageTransition(nn.Module):
 class ResidualStepsNetwork(nn.Module):
     def __init__(self,
                  stage_layer_blocks: Sequence[Sequence[int]],
+                 enable_layer_supervision: bool = True,
                  cfg: dict = None, ):
         super().__init__()
 
         cfg = copy.deepcopy(cfg) or {}
 
         self.n_stages = len(stage_layer_blocks)
+        assert self.n_stages > 0, "There must be at least one stage."
+
+        self.enable_layer_supervision = enable_layer_supervision
 
         self.stem = Stem(**cfg)
 
@@ -474,8 +484,9 @@ class ResidualStepsNetwork(nn.Module):
         ul_skips = None
         stage_outs = list()
         for i in range(self.n_stages):
-            x, dl_skips, ul_skips = self.stages[i](x, dl_skips, ul_skips)
-            stage_outs.append(x)
+            ul_output, dl_skips, ul_skips = self.stages[i](x, dl_skips, ul_skips)
+            stage_outs.append(ul_output)
+            x = ul_output[-1] if self.enable_layer_supervision else ul_output
             if i < self.n_stages - 1:
                 x = self.transitions[i](x)
 

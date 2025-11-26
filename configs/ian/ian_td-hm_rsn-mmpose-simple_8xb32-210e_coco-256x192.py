@@ -1,3 +1,5 @@
+# Config using RSN-MMPose as backbone, and simple codec and head
+
 _base_ = ['../_base_/default_runtime.py']
 
 # runtime
