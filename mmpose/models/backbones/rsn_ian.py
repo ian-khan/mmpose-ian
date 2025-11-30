@@ -448,7 +448,8 @@ class ResidualStepsNetwork(nn.Module):
     def __init__(self,
                  stage_layer_blocks: Sequence[Sequence[int]],
                  enable_layer_supervision: bool = True,
-                 cfg: dict = None, ):
+                 cfg: dict = None,
+                 **kwargs):
         super().__init__()
 
         cfg = copy.deepcopy(cfg) or {}

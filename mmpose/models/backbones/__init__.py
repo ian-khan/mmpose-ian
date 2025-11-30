@@ -18,7 +18,7 @@ from .resnest import ResNeSt
 from .resnet import ResNet, ResNetV1d
 from .resnext import ResNeXt
 from .rsn import RSN
-from .rsn_new import ResidualStepsNetwork
+from .rsn_ian import ResidualStepsNetwork
 from .scnet import SCNet
 from .seresnet import SEResNet
 from .seresnext import SEResNeXt

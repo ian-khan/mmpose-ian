@@ -1,6 +1,6 @@
 # Print the named parameters of reimplemented RSN
 # to figure out what parameters are not used for loss calculation
-from mmpose.models.backbones.rsn_new import ResidualStepsNetwork
+from mmpose.models.backbones.rsn_ian import ResidualStepsNetwork
 
 rsn = ResidualStepsNetwork([[3, 4, 6, 3]])
 
