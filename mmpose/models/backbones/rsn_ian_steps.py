@@ -63,28 +63,21 @@ class SwinStep(nn.Module):
         )
 
         # Relative position biases
-        self.bias_buckets = nn.Parameter(
-            torch.zeros((2 * win_size[0] - 1) * (2 * win_size[1] - 1), self.num_heads))
-        # bias bucket initialization
+        num_rel_pos = (2 * win_size[0] - 1) * (2 * win_size[1] - 1)
+        self.bias_buckets = nn.Parameter(torch.zeros(num_rel_pos, self.num_heads))
+        # TODO: bias buckets initialization
 
         # Relative position biases index
-        rel_pos_to_bias_bucket = \
-            self.compute_rel_pos_to_bias_bucket(win_size[0], win_size[1])
+        rel_pos_to_bias_bucket = self.compute_rel_pos_to_bias_bucket(win_size)
         self.register_buffer('rel_pos_to_bias_bucket', rel_pos_to_bias_bucket)
 
-        # Attention mask
+        # Attention mask, only needed for Shifted Window Multihead Self-Attention
         if self.do_shift:
             attn_mask = self.compute_attn_mask(input_size, win_size, shift)
             self.register_buffer('attn_mask', attn_mask)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            x: input tensor
-
-        Returns:
-
-        """
+        # Get and compute the tensor shapes-related variables
         B, mh, mw, C = x.shape
         assert (mh, mw) == self.input_size, "Input resolution is not correct"
         wh, ww = self.win_size
@@ -93,65 +86,78 @@ class SwinStep(nn.Module):
 
         shortcut = x
 
-        x = self.norm1(x)
+        x = self.norm1(x)  # B, mh, mw, C
 
+        # Cyclic shift
         if self.do_shift:
             x = torch.roll(x, shifts=(-self.shift[0], -self.shift[1]), dims=(1, 2))
 
+        # Partition windows
         x = self.window_partition(x, self.win_size)  # BxW, wh, ww, C
 
-        qkv = self.qkv(x).reshape(B*W, T, 3, self.num_heads, self.head_channels)
-        qkv = qkv.permute(2, 0, 3, 1, 4)  # 3, BxW, H, T, hc
+        # Compute q, k, v
+        qkv = self.qkv(x)  # BxW, wh, ww, 3C
+        # Split heads and flatten window tokens
+        qkv = qkv.reshape(B*W, T, 3, self.num_heads, self.head_channels)  # BxW, T, 3, H, hc
+        # Get ready for per-head matrix multiplication
+        qkv = qkv.permute(2, 0, 3, 1, 4).contiguous()  # 3, BxW, H, T, hc
+        # Split q, k, v
         q, k, v = qkv[0], qkv[1], qkv[2]  # BxW, H, T, hc
 
+        # Compute normalized attention scores
         attn = (q @ k.transpose(-2, -1)) * self.qk_scale  # BxW, H, T, T
 
-        bias = self.bias_buckets[self.rel_pos_to_bias_bucket.view(-1)].view(T, T, self.num_heads)  # T, T, H
+        # Add the relative position biases
+        bias = self.bias_buckets[self.rel_pos_to_bias_bucket.view(-1)]  # T*T, H
+        bias = bias.view(T, T, self.num_heads)  # T, T, H
         bias = bias.permute(2, 0, 1).contiguous()  # H, T, T
         attn = attn + bias  # BxW, H, T, T
 
+        # Apply the attention mask
         if self.do_shift:
             attn = attn.view(B, W, self.num_heads, T, T)  # B, W, H, T, T
-            attn = attn + self.attn_mask
-            attn = attn.view(B*W, self.num_heads, T, T)  # BxW, nh, T, T
+            attn = attn + self.attn_mask  # mask: 1, W, 1, T, T
+            attn = attn.view(B*W, self.num_heads, T, T)  # BxW, H, T, T
 
+        # Softmax then dropout
         attn = self.softmax(attn)
         attn = self.attn_drop(attn)
 
+        # Attention output
         x = attn @ v  # BxW, H, T, hc
-        x = x.transpose(1, 2).reshape(B*W, T, C)  # BxW, T, C
+        # Concatenate heads and unflatten window
+        x = x.transpose(1, 2).reshape(B*W, wh, ww, C)  # BxW, wh, ww, C
 
+        # Projection and dropout
         x = self.proj(x)
         x = self.proj_drop(x)
 
-        x = x.view(B*W, wh, ww, C)
+        # Stitch windows
         x = self.window_stitch(x, self.input_size)  # B, mh, mw, C
 
+        # Reverse cyclic shift
         if self.do_shift:
             x = torch.roll(x, shifts=self.shift, dims=(1, 2))
 
-        x = x + shortcut
+        x = x + shortcut  # B, mh, mw, C
 
-        x = x.view(B, mh * mw, C)
-
-        x = x + self.mlp(x)
-
-        x= x.view(B, mh, mw, C)
+        # MLP
+        x = self.mlp(self.norm2(x)) + x  # B, mh, mw, C
         return x
 
     @staticmethod
-    def compute_rel_pos_to_bias_bucket(wh: int,
-                                       ww: int) -> torch.Tensor:
+    def compute_rel_pos_to_bias_bucket(win_size: tuple[int, int]) -> torch.Tensor:
         """
-        Compute the mapping from relative position
-        between query token and key token to bias bucket.
+        Compute the mapping from relative position between query token and key token to bias bucket,
+        which is the same for each window, and different for each head.
         Args:
-            wh: height of the window
-            ww: width of the window
+            win_size: Spatial size of the window
 
-        Returns: the mapping
+        Returns: the mapping (wh*ww, wh*ww) or (T, T)
 
         """
+        wh, ww = win_size
+
         # Create the coordinate sequence for tokens in a window
         coord_h = torch.arange(wh)
         coord_w = torch.arange(ww)
@@ -173,6 +179,17 @@ class SwinStep(nn.Module):
 
     @staticmethod
     def compute_attn_mask(input_size, win_size, shift) -> torch.Tensor:
+        """
+        Compute the attention mask, which is different for each window and
+        same for each head.
+        Args:
+            input_size: Spatial size of the input feature map
+            win_size: Spatial size of the window
+            shift: The shift for window partition
+
+        Returns: The attention mask (1, W, 1, T, T)
+
+        """
         region_chart = torch.zeros((1, input_size[0], input_size[1], 1))
         h_slices = (slice(0, -win_size[0]),
                     slice(-win_size[0], -shift[0]),
