@@ -18,7 +18,7 @@ class SwinStep(nn.Module):
                  in_channels: int,
                  input_size: tuple[int, int],
                  shift: tuple[int, int],
-                 head_channels: int=32,
+                 head_channels: int=26,
                  mlp_ratio: int=4,
                  win_size: tuple[int, int]=(2, 2),
                  qkv_bias: bool=True,
@@ -81,6 +81,17 @@ class SwinStep(nn.Module):
             self.register_buffer('attn_mask', attn_mask)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward propagation.
+        Args:
+            x: Tensor of shape (B, C, mh, mw)
+
+        Returns: Tensor of shape (B, C, mh, mw)
+
+        """
+        # Convert from CV convention to NLP convention
+        x = x.permute(0, 2, 3, 1).contiguous()  # B, mh, mw, C
+
         # Get and compute the tensor shapes-related variables
         B, mh, mw, C = x.shape
         assert (mh, mw) == self.input_size, "Input resolution is not correct"
@@ -147,6 +158,9 @@ class SwinStep(nn.Module):
 
         # MLP
         x = self.drop_path(self.mlp(self.norm2(x))) + x  # B, mh, mw, C
+
+        # Convert from NLP convention to CV convention
+        x = x.permute(0, 3, 1, 2).contiguous()  # B, C, mh, mw
         return x
 
     @staticmethod
