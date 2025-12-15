@@ -1,5 +1,5 @@
 import torch
-from mmpose.models.backbones.rsn_ian_steps import SwinStep
+from mmpose.models.backbones.rsn_swin import SwinStep
 
 step = SwinStep(in_channels=64,
                 input_size=(32, 24),
