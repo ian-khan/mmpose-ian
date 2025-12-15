@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from typing import Optional
+from timm.models.layers import DropPath, trunc_normal_
 
 class SwinStep(nn.Module):
     """
@@ -24,6 +25,7 @@ class SwinStep(nn.Module):
                  qk_scale: Optional[float]=None,
                  attn_drop: float=0.,
                  linear_drop: float=0.,
+                 path_drop: float=0.,
                  act_layer: nn.Module=nn.GELU,
                  norm_layer: nn.Module=nn.LayerNorm,
                  **kwargs):
@@ -62,10 +64,12 @@ class SwinStep(nn.Module):
             nn.Dropout(linear_drop),
         )
 
+        self.drop_path = DropPath(path_drop) if path_drop > 0. else nn.Identity()
+
         # Relative position biases
         num_rel_pos = (2 * win_size[0] - 1) * (2 * win_size[1] - 1)
         self.bias_buckets = nn.Parameter(torch.zeros(num_rel_pos, self.num_heads))
-        # TODO: bias buckets initialization
+        trunc_normal_(self.bias_buckets, std=.02)
 
         # Relative position biases index
         rel_pos_to_bias_bucket = self.compute_rel_pos_to_bias_bucket(win_size)
@@ -139,10 +143,10 @@ class SwinStep(nn.Module):
         if self.do_shift:
             x = torch.roll(x, shifts=self.shift, dims=(1, 2))
 
-        x = x + shortcut  # B, mh, mw, C
+        x = self.drop_path(x) + shortcut  # B, mh, mw, C
 
         # MLP
-        x = self.mlp(self.norm2(x)) + x  # B, mh, mw, C
+        x = self.drop_path(self.mlp(self.norm2(x))) + x  # B, mh, mw, C
         return x
 
     @staticmethod
