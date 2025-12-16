@@ -32,7 +32,7 @@ class SwinStep(nn.Module):
         super().__init__()
 
         assert in_channels % head_channels == 0, \
-            "in_channels must be divisible by head_channels"
+            f"in_channels {in_channels} must be divisible by head_channels {head_channels}"
         assert input_size[0] % win_size[0] == 0 and input_size[1] % win_size[1] == 0,\
             "input_size must be divisible by win_size"
         assert 0 <= shift[0] < win_size[0] and 0 <= shift[1] < win_size[1], \
@@ -84,14 +84,11 @@ class SwinStep(nn.Module):
         """
         Forward propagation.
         Args:
-            x: Tensor of shape (B, C, mh, mw)
+            x: Tensor of shape (B, mh, mw, C)
 
-        Returns: Tensor of shape (B, C, mh, mw)
+        Returns: Tensor of shape (B, mh, mw, C)
 
         """
-        # Convert from CV convention to NLP convention
-        x = x.permute(0, 2, 3, 1).contiguous()  # B, mh, mw, C
-
         # Get and compute the tensor shapes-related variables
         B, mh, mw, C = x.shape
         assert (mh, mw) == self.input_size, "Input resolution is not correct"
@@ -159,8 +156,6 @@ class SwinStep(nn.Module):
         # MLP
         x = self.drop_path(self.mlp(self.norm2(x))) + x  # B, mh, mw, C
 
-        # Convert from NLP convention to CV convention
-        x = x.permute(0, 3, 1, 2).contiguous()  # B, C, mh, mw
         return x
 
     @staticmethod
@@ -247,3 +242,96 @@ class SwinStep(nn.Module):
         x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, mh, mw, C)
         return x
 
+
+class ResidualSwinStepsBlock(nn.Module):
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 stride: int,
+                 stage_in_reso: tuple[int, int] = (64, 48),
+                 stage_in_channels: int=64,
+                 base_branch_channels: int=26,
+                 n_branches: int=4,
+                 cfg: dict = None,
+                 **kwargs):
+        super().__init__()
+
+        reso_level, mod = divmod(out_channels, stage_in_channels)
+        assert mod == 0, "out_channels must be divisible by stage_in_channels"
+        assert stride in (1, 2), "Stride must be 1 or 2"
+        assert n_branches >= 1, "There should be at least one branch"
+
+        cfg = cfg or {}
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.branch_channels = reso_level * base_branch_channels
+        self.input_size = (stage_in_reso[0] // reso_level,
+                           stage_in_reso[1] // reso_level)
+        self.n_branches = n_branches
+        self.stride = stride
+
+
+        if stride == 1:
+            # Channel expansion
+            self.stem_diverge = nn.Sequential(
+                nn.LayerNorm(in_channels),
+                nn.Linear(in_channels, n_branches * self.branch_channels),
+            )
+        elif stride == 2:
+            # Patch merging and channel expansion
+            self.stem_diverge = nn.Sequential(
+                nn.LayerNorm(4 * in_channels),
+                nn.Linear(4 * in_channels, n_branches * self.branch_channels),
+            )
+
+        self.branched_steps = nn.ModuleList()
+        for b in range(n_branches):
+            self.branched_steps.append(nn.ModuleList())
+            # the b-th branch has b steps
+            for s in range(b+1):
+                shift = (1, 1) if (b + s) % 2 else (0, 0)
+                self.branched_steps[b].append(
+                    SwinStep(self.branch_channels,
+                             self.input_size,
+                             shift,
+                             **cfg)
+                )
+
+        self.stem_converge = nn.Sequential(
+            nn.LayerNorm(n_branches * self.branch_channels),
+            nn.Linear(n_branches * self.branch_channels, out_channels),
+        )
+
+    def forward(self, x):
+        if self.stride == 2:
+            x0 = x[:, :, 0::2, 0::2]
+            x1 = x[:, :, 1::2, 0::2]
+            x2 = x[:, :, 0::2, 1::2]
+            x3 = x[:, :, 1::2, 1::2]
+            x = torch.cat([x0, x1, x2, x3], dim=1)
+
+        x = x.permute(0, 2, 3, 1).contiguous()
+
+        x = self.stem_diverge(x)  # B, mh, mw, bn * bc
+
+        x = torch.split(x, self.branch_channels, dim=3)  # bn x (B, mh, mw, bc)
+
+        # The input and output tensors involved in the steps,
+        # each tensor in the grid is of shape (B, mh, mw, bc).
+        tensor_grid = []
+        for b in range(self.n_branches):
+            tensor_grid.append([x[b]])
+            for s in range(b + 1):
+                input_tensor = tensor_grid[b][s]
+                if s < b:
+                    input_tensor = input_tensor + tensor_grid[b - 1][s + 1]
+                output_tensor = self.branched_steps[b][s](input_tensor)
+                tensor_grid[b].append(output_tensor)
+
+        x = torch.cat([tensor_grid[b][b + 1] for b in range(self.n_branches)], dim=3)
+        x = self.stem_converge(x)
+
+        x = x.permute(0, 3, 1, 2).contiguous()
+
+        return x
