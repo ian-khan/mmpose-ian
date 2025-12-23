@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from typing import Optional
+from typing import Optional, Tuple
 from timm.models.layers import DropPath, trunc_normal_
 
 class SwinStep(nn.Module):
@@ -16,11 +16,11 @@ class SwinStep(nn.Module):
     """
     def __init__(self,
                  in_channels: int,
-                 input_size: tuple[int, int],
-                 shift: tuple[int, int],
+                 input_size: Tuple[int, int],
+                 shift: Tuple[int, int],
                  head_channels: int=26,
                  mlp_ratio: int=4,
-                 win_size: tuple[int, int]=(2, 2),
+                 win_size: Tuple[int, int]=(2, 2),
                  qkv_bias: bool=True,
                  qk_scale: Optional[float]=None,
                  attn_drop: float=0.,
@@ -159,7 +159,7 @@ class SwinStep(nn.Module):
         return x
 
     @staticmethod
-    def compute_rel_pos_to_bias_bucket(win_size: tuple[int, int]) -> torch.Tensor:
+    def compute_rel_pos_to_bias_bucket(win_size: Tuple[int, int]) -> torch.Tensor:
         """
         Compute the mapping from relative position between query token and key token to bias bucket,
         which is the same for each window, and different for each head.
@@ -248,7 +248,7 @@ class ResidualSwinStepsBlock(nn.Module):
                  in_channels: int,
                  out_channels: int,
                  stride: int,
-                 stage_in_reso: tuple[int, int] = (64, 48),
+                 stage_in_reso: Tuple[int, int] = (64, 48),
                  stage_in_channels: int=64,
                  base_branch_channels: int=26,
                  n_branches: int=4,

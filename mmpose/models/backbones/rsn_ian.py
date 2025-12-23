@@ -9,6 +9,8 @@ from torch import nn
 import torch.nn.functional as F
 from mmengine.model import BaseModule
 
+from .rsn_swin import ResidualSwinStepsBlock
+
 # In a hierarchical neural network structure, the basic module on each level is represented by a class.
 # Instances of a child module are created inside an instance of the parent module.
 
@@ -205,7 +207,7 @@ class DownsampleLayer(BaseModule):
                  n_blocks: int,
                  in_first_stage: bool,
                  in_final_stage: bool,
-                 block: nn.Module = ResidualStepsBlock,
+                 block: nn.Module = ResidualSwinStepsBlock,
                  enable_stage_skip: bool = True,  # False for debug; True for deploy
                  cfg: dict = None,
                  **kwargs):
