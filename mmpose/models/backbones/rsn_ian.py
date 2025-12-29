@@ -445,7 +445,7 @@ class InterstageTransition(nn.Module):
         return x
 
 
-@MODELS.register_module()
+# @MODELS.register_module()
 class ResidualStepsNetwork(nn.Module):
     def __init__(self,
                  stage_layer_blocks: Sequence[Sequence[int]],
