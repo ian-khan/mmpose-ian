@@ -1,4 +1,4 @@
-"""Config using RSB Alter A"""
+"""Config using RSB Alter B"""
 
 custom_imports = dict(
     imports=['pose_estimation.models.backbones.rsn_ian'],
@@ -25,7 +25,7 @@ param_scheduler = [
         type='MultiStepLR',
         begin=0,
         end=210,
-        milestones=[170, 200],
+        milestones=[140, 190],
         gamma=0.1,
         by_epoch=True)
 ]
@@ -62,7 +62,7 @@ model = dict(
     backbone=dict(
         type='ResidualStepsNetwork',
         stage_layer_blocks=[[3, 4, 6, 3]],
-        model_cfg=dict(block_cfg=dict(type='RSBAlterA')),
+        model_cfg=dict(block_cfg=dict(type='RSBAlterB')),
     ),
     head=dict(
         type='MSPNHead',
@@ -119,7 +119,7 @@ val_pipeline = [
 
 # data loaders
 train_dataloader = dict(
-    batch_size=64,
+    batch_size=128,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -132,7 +132,7 @@ train_dataloader = dict(
         pipeline=train_pipeline,
     ))
 val_dataloader = dict(
-    batch_size=64,
+    batch_size=128,
     num_workers=4,
     persistent_workers=True,
     drop_last=False,
