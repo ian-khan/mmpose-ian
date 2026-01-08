@@ -1,7 +1,8 @@
 """Config using RSB Alter B"""
 
 custom_imports = dict(
-    imports=['pose_estimation.models.backbones.rsn_ian'],
+    imports=['pose_estimation.models.backbones.rsn_ian',
+             'pose_estimation.models.blocks.cnn_blocks'],
     allow_failed_imports=False
 )
 
@@ -62,7 +63,9 @@ model = dict(
     backbone=dict(
         type='ResidualStepsNetwork',
         stage_layer_blocks=[[3, 4, 6, 3]],
-        model_cfg=dict(block_cfg=dict(type='RSBAlterB')),
+        cfg_overrides={"down_layer.block_name": "RSBAlterB",
+                       "block.relative_rfs": (0, 2, 6),
+                       "block.n_fusions": 4},
     ),
     head=dict(
         type='MSPNHead',
@@ -119,7 +122,7 @@ val_pipeline = [
 
 # data loaders
 train_dataloader = dict(
-    batch_size=128,
+    batch_size=256,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -132,7 +135,7 @@ train_dataloader = dict(
         pipeline=train_pipeline,
     ))
 val_dataloader = dict(
-    batch_size=128,
+    batch_size=256,
     num_workers=4,
     persistent_workers=True,
     drop_last=False,

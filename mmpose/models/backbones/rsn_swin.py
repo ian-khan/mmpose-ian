@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from typing import Optional, Tuple
-from timm.models.layers import DropPath, trunc_normal_
+from timm.layers import DropPath, trunc_normal_
 
 class SwinStep(nn.Module):
     """
