@@ -1,7 +1,15 @@
+"""Config 3xRSN with RSB Alter C"""
+
+custom_imports = dict(
+    imports=['pose_estimation.models.backbones.rsn_ian',
+             'pose_estimation.models.blocks.cnn_blocks'],
+    allow_failed_imports=False
+)
+
 _base_ = ['../_base_/default_runtime.py']
 
 # runtime
-train_cfg = dict(max_epochs=210, val_interval=10)
+train_cfg = dict(max_epochs=210, val_interval=5)
 
 # optimizer
 optim_wrapper = dict(optimizer=dict(
@@ -27,8 +35,11 @@ param_scheduler = [
 auto_scale_lr = dict(base_batch_size=256)
 
 # hooks
-default_hooks = dict(checkpoint=dict(interval=5, save_last=True,
-                                     save_best='coco/AP', rule='greater'))
+default_hooks = dict(checkpoint=dict(interval=5,
+                                     max_keep_ckpts=10,
+                                     save_last=True,
+                                     save_best='coco/AP',
+                                     rule='greater'))
 
 # codec settings
 # multiple kernel_sizes of heatmap gaussian for 'Megvii' approach.
@@ -50,13 +61,12 @@ model = dict(
         std=[58.395, 57.12, 57.375],
         bgr_to_rgb=True),
     backbone=dict(
-        type='RSN',
-        unit_channels=256,
-        num_stages=3,
-        num_units=4,
-        num_blocks=[3, 4, 6, 3],
-        num_steps=4,
-        norm_cfg=dict(type='BN'),
+        type='ResidualStepsNetwork',
+        stage_layer_blocks=((3, 4, 6, 3),
+                            (3, 4, 6, 3),
+                            (3, 4, 6, 3)),
+        cfg_overrides={"down_layer.block_name": "RSBAlterC",
+                       "block.relative_rfs": (2, 4, 6)},
     ),
     head=dict(
         type='MSPNHead',
@@ -113,7 +123,7 @@ val_pipeline = [
 
 # data loaders
 train_dataloader = dict(
-    batch_size=32,
+    batch_size=128,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -126,7 +136,7 @@ train_dataloader = dict(
         pipeline=train_pipeline,
     ))
 val_dataloader = dict(
-    batch_size=32,
+    batch_size=128,
     num_workers=4,
     persistent_workers=True,
     drop_last=False,
