@@ -1,4 +1,4 @@
-"""Config 3xRSN with RSB Alter C"""
+"""Config 4xRSN with RSB Alter C"""
 
 custom_imports = dict(
     imports=['pose_estimation.models.backbones.rsn_ian',
@@ -26,7 +26,7 @@ param_scheduler = [
         type='MultiStepLR',
         begin=0,
         end=210,
-        milestones=[170, 200],
+        milestones=[160, 190],
         gamma=0.1,
         by_epoch=True)
 ]
@@ -47,8 +47,8 @@ kernel_sizes = [15, 11, 9, 7, 5]
 codec = [
     dict(
         type='MegviiHeatmap',
-        input_size=(192, 256),
-        heatmap_size=(48, 64),
+        input_size=(288, 384),
+        heatmap_size=(72, 96),
         kernel_size=kernel_size) for kernel_size in kernel_sizes
 ]
 
@@ -64,21 +64,22 @@ model = dict(
         type='ResidualStepsNetwork',
         stage_layer_blocks=((3, 4, 6, 3),
                             (3, 4, 6, 3),
+                            (3, 4, 6, 3),
                             (3, 4, 6, 3)),
         cfg_overrides={"down_layer.block_name": "RSBAlterC",
                        "block.relative_rfs": (2, 4, 6)},
     ),
     head=dict(
         type='MSPNHead',
-        out_shape=(64, 48),
+        out_shape=(96, 72),
         unit_channels=256,
         out_channels=17,
-        num_stages=3,
+        num_stages=4,
         num_units=4,
         norm_cfg=dict(type='BN'),
         # each sub list is for a stage
         # and each element in each list is for a unit
-        level_indices=[0, 1, 2, 3] * 2 + [1, 2, 3, 4],
+        level_indices=[0, 1, 2, 3] * 3 + [1, 2, 3, 4],
         loss=([
             dict(
                 type='KeypointMSELoss',
@@ -89,7 +90,7 @@ model = dict(
                 type='KeypointOHKMMSELoss',
                 use_target_weight=True,
                 loss_weight=1.)
-        ]) * 3,
+        ]) * 4,
         decoder=codec[-1]),
     test_cfg=dict(
         flip_test=True,
@@ -123,7 +124,7 @@ val_pipeline = [
 
 # data loaders
 train_dataloader = dict(
-    batch_size=128,
+    batch_size=64,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -136,7 +137,7 @@ train_dataloader = dict(
         pipeline=train_pipeline,
     ))
 val_dataloader = dict(
-    batch_size=128,
+    batch_size=64,
     num_workers=4,
     persistent_workers=True,
     drop_last=False,
