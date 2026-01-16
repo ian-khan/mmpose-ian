@@ -17,7 +17,12 @@ experiments = [Experiment(file_name="/data/ian/remote_projects/mmpose/work_dirs/
                Experiment(file_name="/data/ian/remote_projects/mmpose/work_dirs/"
                                     "ian_td-hm_3xrsn-alter-c_8xb32-210e_coco-256x192/"
                                     "20260109_224458/vis_data/20260109_224458.json",
-                          legend="3xRSN-50 Alter C"),]
+                          legend="3xRSN-50 Alter C"),
+               Experiment(file_name="/data/ian/remote_projects/mmpose/work_dirs/"
+                                    "ian_td-hm_4xrsn-alter-c_3xb64-210e_coco-384x288/"
+                                    "20260112_154914/vis_data/20260112_154914.json",
+                          legend="4xRSN-50 Alter C"),
+               ]
 
 plt.figure()
 for experiment in experiments:
@@ -27,7 +32,7 @@ plt.ylabel("Loss")
 plt.legend()
 plt.grid(True)
 # plt.show()
-plt.savefig("3xrsn-loss.jpg")
+plt.savefig("3and4xrsn-loss.jpg")
 
 plt.figure()
 for experiment in experiments:
@@ -37,4 +42,4 @@ plt.ylabel("COCO AP")
 plt.legend()
 plt.grid(True)
 # plt.show()
-plt.savefig("3xrsn-coco-ap.jpg")
+plt.savefig("3and4xrsn-coco-ap.jpg")
