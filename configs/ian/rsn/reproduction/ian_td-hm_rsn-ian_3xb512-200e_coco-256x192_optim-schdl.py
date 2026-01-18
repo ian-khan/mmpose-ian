@@ -1,37 +1,38 @@
 # Config for RSN-Ian, using matching optimizer and LR scheduler as the RSN paper
 
-_base_ = ['../_base_/default_runtime.py']
+_base_ = ['../../../_base_/default_runtime.py']
+
+custom_imports = dict(
+    imports=['pose_estimation.models.backbones.rsn_ian',
+             'pose_estimation.models.blocks.cnn_blocks'],
+    allow_failed_imports=False
+)
 
 # runtime
-train_cfg = dict(max_epochs=210, val_interval=10)
+train_cfg = dict(max_epochs=200, val_interval=5)
 
 # optimizer
-optim_wrapper = dict(optimizer=dict(
-    type='Adam',
-    lr=5e-3,
-))
+optim_wrapper = dict(optimizer=dict(type='Adam',
+                                    lr=5e-4,
+                                    weight_decay=1e-5))
 
 # learning policy
-param_scheduler = [
-    dict(
-        type='LinearLR', begin=0, end=500, start_factor=0.001,
-        by_epoch=False),  # warm-up
-    dict(
-        type='MultiStepLR',
-        begin=0,
-        end=210,
-        milestones=[170, 200],
-        gamma=0.1,
-        by_epoch=True)
-]
+param_scheduler = [dict(type='PolyLR',
+                        eta_min=0.0,
+                        power=1,
+                        begin=0,
+                        end=200,
+                        by_epoch=True)]
 
 # automatically scaling LR based on the actual training batch size
-auto_scale_lr = dict(base_batch_size=256)
+auto_scale_lr = dict(base_batch_size=384)
 
 # hooks
-default_hooks = dict(checkpoint=dict(interval=5, max_keep_ckpts=10,
+default_hooks = dict(checkpoint=dict(interval=10,
+                                     max_keep_ckpts=3,
                                      save_last=True,
-                                     save_best='coco/AP', rule='greater'))
+                                     save_best='coco/AP',
+                                     rule='greater'))
 
 # codec settings
 # multiple kernel_sizes of heatmap gaussian for 'Megvii' approach.
@@ -54,7 +55,10 @@ model = dict(
         bgr_to_rgb=True),
     backbone=dict(
         type='ResidualStepsNetwork',
-        stage_layer_blocks=[[3, 4, 6, 3]]
+        stage_layer_blocks=((3, 4, 6, 3),),
+        cfg_overrides={"down_layer.block_name": "RSBIan",
+                       "block.base_branch_channels": 26,
+                       "block.relative_rfs": ("",) * 4,},
     ),
     head=dict(
         type='MSPNHead',
@@ -111,8 +115,8 @@ val_pipeline = [
 
 # data loaders
 train_dataloader = dict(
-    batch_size=32,
-    num_workers=4,
+    batch_size=512,
+    num_workers=8,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
@@ -124,8 +128,8 @@ train_dataloader = dict(
         pipeline=train_pipeline,
     ))
 val_dataloader = dict(
-    batch_size=32,
-    num_workers=4,
+    batch_size=512,
+    num_workers=8,
     persistent_workers=True,
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),

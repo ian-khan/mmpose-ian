@@ -1,6 +1,6 @@
 # Config for RSN-Ian, using ground truth bounding boxes as human detection results in testing
 
-_base_ = ['../_base_/default_runtime.py']
+_base_ = ['../../../_base_/default_runtime.py']
 
 # runtime
 train_cfg = dict(max_epochs=210, val_interval=10)
@@ -111,7 +111,7 @@ val_pipeline = [
 
 # data loaders
 train_dataloader = dict(
-    batch_size=32,
+    batch_size=256,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -124,7 +124,7 @@ train_dataloader = dict(
         pipeline=train_pipeline,
     ))
 val_dataloader = dict(
-    batch_size=32,
+    batch_size=256,
     num_workers=4,
     persistent_workers=True,
     drop_last=False,
@@ -134,8 +134,7 @@ val_dataloader = dict(
         data_root=data_root,
         data_mode=data_mode,
         ann_file='annotations/person_keypoints_val2017.json',
-        bbox_file='data/coco/person_detection_results/'
-        'COCO_val2017_detections_AP_H_56_person.json',
+        bbox_file=None,
         data_prefix=dict(img='val2017/'),
         test_mode=True,
         pipeline=val_pipeline,
