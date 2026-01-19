@@ -56,9 +56,9 @@ model = dict(
     backbone=dict(
         type='ResidualStepsNetwork',
         stage_layer_blocks=((3, 4, 6, 3),),
-        cfg_overrides={"down_layer.block_name": "RSBIan",
-                       "block.base_branch_channels": 26,
-                       "block.relative_rfs": ("",) * 4,},
+        cfg_overrides={"down_layer.block_name": "RSBAlterC",
+                       "block.base_branch_channels": 32,
+                       "block.relative_rfs": (2, 4, 6)},
     ),
     head=dict(
         type='MSPNHead',
