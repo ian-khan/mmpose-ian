@@ -9,7 +9,7 @@ custom_imports = dict(
 )
 
 # runtime
-train_cfg = dict(max_epochs=200, val_interval=5)
+train_cfg = dict(max_epochs=360, val_interval=5)
 
 # optimizer
 optim_wrapper = dict(optimizer=dict(type='Adam',
@@ -17,11 +17,16 @@ optim_wrapper = dict(optimizer=dict(type='Adam',
                                     weight_decay=1e-5))
 
 # learning policy
-param_scheduler = [dict(type='PolyLR',
+param_scheduler = [dict(type='LinearLR',
+                        begin=0,
+                        end=500,
+                        start_factor=0.001,
+                        by_epoch=False),
+                   dict(type='PolyLR',
                         eta_min=0.0,
                         power=1,
                         begin=0,
-                        end=200,
+                        end=360,
                         by_epoch=True)]
 
 # automatically scaling LR based on the actual training batch size
@@ -29,7 +34,7 @@ auto_scale_lr = dict(base_batch_size=384)
 
 # hooks
 default_hooks = dict(checkpoint=dict(interval=10,
-                                     max_keep_ckpts=3,
+                                     max_keep_ckpts=1,
                                      save_last=True,
                                      save_best='coco/AP',
                                      rule='greater'))
@@ -115,7 +120,7 @@ val_pipeline = [
 
 # data loaders
 train_dataloader = dict(
-    batch_size=512,
+    batch_size=128,
     num_workers=8,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -128,7 +133,7 @@ train_dataloader = dict(
         pipeline=train_pipeline,
     ))
 val_dataloader = dict(
-    batch_size=512,
+    batch_size=128,
     num_workers=8,
     persistent_workers=True,
     drop_last=False,
