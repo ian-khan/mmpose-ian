@@ -19,18 +19,18 @@ optim_wrapper = dict(optimizer=dict(type='Adam',
 # learning policy
 param_scheduler = [dict(type='LinearLR',
                         begin=0,
-                        end=500,
-                        start_factor=0.001,
+                        end=2400,
+                        start_factor=0.1,
                         by_epoch=False),
                    dict(type='PolyLR',
                         eta_min=0.0,
                         power=1,
                         begin=0,
-                        end=360,
-                        by_epoch=True)]
+                        end=140760,
+                        by_epoch=False)]
 
 # automatically scaling LR based on the actual training batch size
-auto_scale_lr = dict(base_batch_size=384)
+auto_scale_lr = dict(base_batch_size=48)
 
 # hooks
 default_hooks = dict(checkpoint=dict(interval=10,
@@ -121,7 +121,7 @@ val_pipeline = [
 # data loaders
 train_dataloader = dict(
     batch_size=128,
-    num_workers=8,
+    num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
@@ -134,7 +134,7 @@ train_dataloader = dict(
     ))
 val_dataloader = dict(
     batch_size=128,
-    num_workers=8,
+    num_workers=4,
     persistent_workers=True,
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
