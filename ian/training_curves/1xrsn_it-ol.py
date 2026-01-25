@@ -11,6 +11,11 @@ experiments = [Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_d
                                      "20260124_000245"],
                           legend="E:360 LR:4e-3 PolyLR"),
                Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
+                                        "ian_td-hm_rsn-ian_3xb128-180e_coco-256x192_ol"),
+                          exp_times=["20260124_121658",
+                                     "20260125_035745"],
+                          legend="E:180 LR:4e-3 PolyLR"),
+               Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
                                         "ian_td-hm_rsn-ian_8xb32-210e_coco-256x192"),
                           exp_times=["20251126_173025"],
                           legend="E:210 LR:7.5e-3 MultiStepLR"),]

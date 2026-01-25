@@ -1,5 +1,6 @@
 # Config for RSN-Ian, using half the iterations of,
-# and the same optimizer and LR scheduler as the RSN paper
+# and the same optimizer as the RSN paper.
+# Use a PolyLR with power 2.
 
 _base_ = ['../../../_base_/default_runtime.py']
 
