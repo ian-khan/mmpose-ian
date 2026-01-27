@@ -15,7 +15,7 @@ train_cfg = dict(max_epochs=180, val_interval=5)
 
 # optimizer
 optim_wrapper = dict(optimizer=dict(type='Adam',
-                                    lr=5e-4,
+                                    lr=4e-3,
                                     weight_decay=1e-5))
 
 # learning policy
@@ -26,13 +26,13 @@ param_scheduler = [dict(type='LinearLR',
                         by_epoch=False),
                    dict(type='PolyLR',
                         eta_min=0.0,
-                        power=1,
+                        power=2,
                         begin=0,
                         end=70380,
                         by_epoch=False)]
 
 # automatically scaling LR based on the actual training batch size
-auto_scale_lr = dict(base_batch_size=48)
+auto_scale_lr = dict(base_batch_size=384)
 
 # hooks
 default_hooks = dict(checkpoint=dict(interval=5,
