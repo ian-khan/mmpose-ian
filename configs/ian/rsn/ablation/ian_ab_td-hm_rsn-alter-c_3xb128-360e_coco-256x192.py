@@ -1,4 +1,5 @@
-# Config for RSN-Ian, using the same iterations; optimizer and LR scheduler as the RSN paper
+"""Config for RSN-Ian with RSB Alter C trained for 360 epochs' worth of iterations,
+using the same optimizer and LR scheduler as the RSN paper."""
 
 _base_ = ['../../../_base_/default_runtime.py']
 
@@ -13,7 +14,7 @@ train_cfg = dict(max_epochs=360, val_interval=5)
 
 # optimizer
 optim_wrapper = dict(optimizer=dict(type='Adam',
-                                    lr=5e-4,
+                                    lr=4e-3,
                                     weight_decay=1e-5))
 
 # learning policy
@@ -30,11 +31,11 @@ param_scheduler = [dict(type='LinearLR',
                         by_epoch=False)]
 
 # automatically scaling LR based on the actual training batch size
-auto_scale_lr = dict(base_batch_size=48)
+auto_scale_lr = dict(base_batch_size=384)
 
 # hooks
 default_hooks = dict(checkpoint=dict(interval=10,
-                                     max_keep_ckpts=1,
+                                     max_keep_ckpts=3,
                                      save_last=True,
                                      save_best='coco/AP',
                                      rule='greater'))
@@ -61,9 +62,9 @@ model = dict(
     backbone=dict(
         type='ResidualStepsNetwork',
         stage_layer_blocks=((3, 4, 6, 3),),
-        cfg_overrides={"down_layer.block_name": "RSBIan",
-                       "block.base_branch_channels": 26,
-                       "block.relative_rfs": ("",) * 4,},
+        cfg_overrides={"down_layer.block_name": "RSBAlterC",
+                       "block.base_branch_channels": 32,
+                       "block.relative_rfs": (2, 4, 6)},
     ),
     head=dict(
         type='MSPNHead',

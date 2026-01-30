@@ -9,20 +9,11 @@ experiments = [Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_d
                                      "20260123_124145",
                                      "20260123_174904",
                                      "20260124_000245"],
-                          legend="E:360 LR:4e-3 PolyLR:1"),
+                          legend="RSB-Ian"),
                Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
-                                        "ian_td-hm_rsn-ian_3xb128-180e_coco-256x192_ol"),
-                          exp_times=["20260124_121658",
-                                     "20260125_035745"],
-                          legend="E:180 LR:4e-3 PolyLR:1"),
-               Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
-                                        "ian_td-hm_rsn-ian_3xb128-180e_coco-256x192_lr-poly-2"),
-                          exp_times=["20260125_160810",],
-                          legend="E:180 LR:4e-3 PolyLR:2"),
-               Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
-                                        "ian_td-hm_rsn-ian_8xb32-210e_coco-256x192"),
-                          exp_times=["20251126_173025"],
-                          legend="E:210 LR:7.5e-3 MultiStepLR"),
+                                        "ian_ab_td-hm_rsn-alter-c_3xb128-360e_coco-256x192"),
+                          exp_times=["20260127_133523"],
+                          legend="RSB Alter C"),
                ]
 
 plt.figure()
@@ -33,7 +24,7 @@ plt.ylabel("Loss")
 plt.legend()
 plt.grid(True)
 # plt.show()
-# plt.savefig("260127_loss.jpg")
+plt.savefig("260130_loss.jpg")
 
 plt.figure()
 for experiment in experiments:
@@ -43,7 +34,7 @@ plt.ylabel("COCO AP")
 plt.legend()
 plt.grid(True)
 # plt.show()
-# plt.savefig("260127_ap.jpg")
+plt.savefig("260130_ap.jpg")
 
 plt.figure()
 for experiment in experiments:
@@ -53,4 +44,4 @@ plt.ylabel("Learning Rate")
 plt.legend()
 plt.grid(True)
 # plt.show()
-plt.savefig("260127_step_lr.jpg")
+plt.savefig("260130_lr.jpg")
