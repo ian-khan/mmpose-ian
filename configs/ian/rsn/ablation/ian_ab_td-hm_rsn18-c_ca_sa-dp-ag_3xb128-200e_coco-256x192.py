@@ -9,30 +9,30 @@ _base_ = ['../../../_base_/default_runtime.py']
 
 custom_imports = dict(
     imports=['pose_estimation.models.backbones',
-             'pose_estimation.models.blocks'],
+             'pose_estimation.models.blocks',
+             'pose_estimation.models.structures',],
     allow_failed_imports=False
 )
 
 # runtime
-train_cfg = dict(max_epochs=360, val_interval=5)
+train_cfg = dict(max_epochs=200, val_interval=5)
 
 # optimizer
 optim_wrapper = dict(optimizer=dict(type='Adam',
-                                    lr=4e-3,
-                                    weight_decay=1e-5))
+                                    lr=7.5e-3))
 
 # learning policy
 param_scheduler = [dict(type='LinearLR',
                         begin=0,
-                        end=2400,
-                        start_factor=0.1,
+                        end=500,
+                        start_factor=0.001,
                         by_epoch=False),
-                   dict(type='PolyLR',
-                        eta_min=0.0,
-                        power=1,
+                   dict(type='MultiStepLR',
                         begin=0,
-                        end=140760,
-                        by_epoch=False)]
+                        end=200,
+                        milestones=[160, 190],
+                        gamma=0.1,
+                        by_epoch=True)]
 
 # automatically scaling LR based on the actual training batch size
 auto_scale_lr = dict(base_batch_size=384)
@@ -65,10 +65,11 @@ model = dict(
         bgr_to_rgb=True),
     backbone=dict(
         type='ResidualStepsNetwork',
-        stage_layer_blocks=((3, 4, 6, 3),),
-        cfg_overrides={"down_layer.block_name": "RSBAlterC",
+        stage_layer_blocks=((2, 2, 2, 2),),
+        cfg_overrides={"block.fusion_name": "ChannelSpatialFusion",
                        "block.base_branch_channels": 32,
-                       "block.relative_rfs": (2, 4, 6)},
+                       "block.relative_rfs": (2, 4, 6),
+                       "down_layer.block_name": "RSBAlterC",},
     ),
     head=dict(
         type='MSPNHead',
