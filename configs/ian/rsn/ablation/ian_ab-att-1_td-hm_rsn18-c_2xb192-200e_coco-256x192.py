@@ -1,7 +1,7 @@
 """Config using RSN-18-Ian with RSB Alter C as backbone;
-Channel Attention enabled, (1/8, ReLU, 8);
-Spatial Attention enabled, (DW 9x9 C>C, ReLU, PW C>G, ReLU);
-Channel and Spatial Attention parallel;
+Channel Attention enabled, (Avg Pool, 1/8, ReLU, 8, Sigmoid);
+Spatial Attention enabled, (DW 9x9 C>C, ReLU, PW C>G, ReLU, Sigmoid);
+Channel and Spatial Attention in parallel;
 Trained for 200 epochs;
 MMPose default optimizer;
 MultistepLR with gamma 0.1 at milestones 160 and 190."""
@@ -67,10 +67,16 @@ model = dict(
     backbone=dict(
         type='ResidualStepsNetwork',
         stage_layer_blocks=((2, 2, 2, 2),),
-        cfg_overrides={"block.fusion_name": "ChannelSpatialFusion",
-                       "block.base_branch_channels": 32,
-                       "block.relative_rfs": (2, 4, 6),
-                       "down_layer.block_name": "RSBAlterC",},
+        cfg_overrides=dict({"attention.mlp_bottleneck": 8,
+                            "attention.has_sa_1": False,
+                            "attention.has_sa_2": True,
+                            "attention.has_sa_3": True,
+                            "attention.use_norm_in_sa": False,
+                            "attention.sa_map_channel_to": "group",
+                            "block.base_branch_channels": 32,
+                            "block.relative_rfs": (2, 4, 6),
+                            "block.attention_name": "AttentionForAblation",
+                            "down_layer.block_name": "RSBAlterC"}),
     ),
     head=dict(
         type='MSPNHead',
@@ -127,7 +133,7 @@ val_pipeline = [
 
 # data loaders
 train_dataloader = dict(
-    batch_size=128,
+    batch_size=192,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -140,7 +146,7 @@ train_dataloader = dict(
         pipeline=train_pipeline,
     ))
 val_dataloader = dict(
-    batch_size=128,
+    batch_size=192,
     num_workers=4,
     persistent_workers=True,
     drop_last=False,
