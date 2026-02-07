@@ -1,6 +1,7 @@
 """Config using RSN-50-Ian with RSB Alter D as backbone;
+Skip Connection around attention disabled;
 Channel Attention enabled, (Avg Pool, 1/8, ReLU, 8, Sigmoid);
-Spatial Attention enabled, (DW 9x9 C>C, BN, ReLU, PW C>G, BN, ReLU, Sigmoid);
+Spatial Attention enabled, (DW 9x9 C>C, ReLU, PW C>G, ReLU, Sigmoid);
 Channel and Spatial Attention in parallel;
 Trained for 200 epochs;
 MMPose default optimizer;
@@ -66,17 +67,19 @@ model = dict(
         bgr_to_rgb=True),
     backbone=dict(
         type='ResidualStepsNetwork',
-        stage_layer_blocks=((2, 2, 2, 2),),
-        cfg_overrides=dict({"attention.mlp_bottleneck": 8,
-                            "attention.has_sa_1": False,
-                            "attention.has_sa_2": True,
-                            "attention.has_sa_3": True,
-                            "attention.use_norm_in_sa": False,
-                            "attention.sa_map_channel_to": "group",
-                            "block.base_branch_channels": 32,
+        stage_layer_blocks=((3, 4, 6, 3),),
+        cfg_overrides=dict({"attention.enable_skip_connection": False,
+                            "attention.attention_order": "parallel",
+                            "attention.enable_channel_attention": True,
+                            "attention.mlp_bottleneck": 8,
+                            "attention.has_spatial_attention_phases": (False, True, True),
+                            "attention.has_spatial_attention_norms": (False, False, False),
+                            "attention.spatial_attention_map_channel_from": "all",
+                            "attention.spatial_attention_map_channel_for": "group",
+                            "block.base_branch_channels": 29,
                             "block.relative_rfs": (2, 4, 6),
                             "block.attention_name": "AttentionForAblation",
-                            "down_layer.block_name": "RSBAlterC"}),
+                            "down_layer.block_name": "RSBAlterD",}),
     ),
     head=dict(
         type='MSPNHead',
@@ -133,7 +136,7 @@ val_pipeline = [
 
 # data loaders
 train_dataloader = dict(
-    batch_size=192,
+    batch_size=128,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -146,7 +149,7 @@ train_dataloader = dict(
         pipeline=train_pipeline,
     ))
 val_dataloader = dict(
-    batch_size=192,
+    batch_size=128,
     num_workers=4,
     persistent_workers=True,
     drop_last=False,
