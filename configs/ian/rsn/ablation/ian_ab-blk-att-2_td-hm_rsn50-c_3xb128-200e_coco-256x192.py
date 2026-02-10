@@ -69,7 +69,7 @@ model = dict(
     backbone=dict(
         type='ResidualStepsNetwork',
         stage_layer_blocks=((3, 4, 6, 3),),
-        cfg_overrides=dict({"attention.enable_skip_connection": True,
+        cfg_overrides=dict({"attention.enable_skip_connection": False,
                             "attention.attention_order": "parallel",
                             "attention.enable_channel_attention": True,
                             "attention.mlp_bottleneck": 8,
