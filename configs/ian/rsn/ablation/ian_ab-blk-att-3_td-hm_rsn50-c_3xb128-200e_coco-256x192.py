@@ -74,7 +74,7 @@ model = dict(
                             "attention.enable_channel_attention": True,
                             "attention.mlp_bottleneck": 8,
                             "attention.has_spatial_attention_phases": (False, True, True),
-                            "attention.has_spatial_attention_norms": (False, True, True),
+                            "attention.has_spatial_attention_norms": (False, False, False),
                             "attention.spatial_attention_map_channel_from": "all",
                             "attention.spatial_attention_map_channel_for": "group",
                             "block.base_branch_channels": 32,
