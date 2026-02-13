@@ -3,7 +3,7 @@ RSN-50-Ian as backbone;
 RSB Alter C as block;
 * Skip Connection around attention disabled;
 Channel Attention enabled, (Avg Pool, 1/8, ReLU, 8, Sigmoid);
-* Spatial Attention disabled;
+* Spatial Attention enabled, (DW 9x9 C>C, BN, ReLU, PW C>C, BN, ReLU, Sigmoid);
 Channel and Spatial Attention in parallel;
 Trained for 200 epochs;
 MMPose style Optimizer and LR Schedulers (0.1, 160, 190)"""
@@ -74,9 +74,9 @@ model = dict(
                             "attention.enable_channel_attention": True,
                             "attention.mlp_bottleneck": 8,
                             "attention.has_spatial_attention_phases": (False, True, True),
-                            "attention.has_spatial_attention_norms": (False, False, False),
+                            "attention.has_spatial_attention_norms": (False, True, True),
                             "attention.spatial_attention_map_channel_from": "all",
-                            "attention.spatial_attention_map_channel_for": "group",
+                            "attention.spatial_attention_map_channel_for": "one",
                             "block.base_branch_channels": 32,
                             "block.relative_rfs": (2, 4, 6),
                             "block.attention_name": "AttentionForAblation",
