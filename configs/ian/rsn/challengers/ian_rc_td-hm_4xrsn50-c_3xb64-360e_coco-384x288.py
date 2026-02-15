@@ -9,43 +9,42 @@ Input Size 384x288;
 Trained for 360 epochs;
 RSN style Optimizer and LR Schedulers"""
 
+_base_ = ['../../../_base_/default_runtime.py']
+
 custom_imports = dict(
-    imports=['pose_estimation.models.backbones.rsn_ian',
-             'pose_estimation.models.blocks.cnn_blocks'],
+    imports=['pose_estimation.models.backbones',
+             'pose_estimation.models.blocks',
+             'pose_estimation.models.structures',],
     allow_failed_imports=False
 )
 
-_base_ = ['../_base_/default_runtime.py']
-
 # runtime
-train_cfg = dict(max_epochs=210, val_interval=5)
+train_cfg = dict(max_epochs=360, val_interval=5)
 
 # optimizer
-optim_wrapper = dict(optimizer=dict(
-    type='Adam',
-    lr=5e-3,
-))
+optim_wrapper = dict(optimizer=dict(type='Adam',
+                                    lr=4e-3,
+                                    weight_decay=1e-5))
 
 # learning policy
-param_scheduler = [
-    dict(
-        type='LinearLR', begin=0, end=500, start_factor=0.001,
-        by_epoch=False),  # warm-up
-    dict(
-        type='MultiStepLR',
-        begin=0,
-        end=210,
-        milestones=[160, 190],
-        gamma=0.1,
-        by_epoch=True)
-]
+param_scheduler = [dict(type='LinearLR',
+                        begin=0,
+                        end=2400,
+                        start_factor=0.1,
+                        by_epoch=False),
+                   dict(type='PolyLR',
+                        eta_min=0.0,
+                        power=1,
+                        begin=0,
+                        end=281160,
+                        by_epoch=False)]
 
 # automatically scaling LR based on the actual training batch size
-auto_scale_lr = dict(base_batch_size=256)
+auto_scale_lr = dict(base_batch_size=384)
 
 # hooks
 default_hooks = dict(checkpoint=dict(interval=5,
-                                     max_keep_ckpts=10,
+                                     max_keep_ckpts=3,
                                      save_last=True,
                                      save_best='coco/AP',
                                      rule='greater'))
@@ -74,9 +73,19 @@ model = dict(
         stage_layer_blocks=((3, 4, 6, 3),
                             (3, 4, 6, 3),
                             (3, 4, 6, 3),
-                            (3, 4, 6, 3)),
-        cfg_overrides={"down_layer.block_name": "RSBAlterC",
-                       "block.relative_rfs": (2, 4, 6)},
+                            (3, 4, 6, 3),),
+        cfg_overrides=dict({"attention.enable_skip_connection": False,
+                            "attention.attention_order": "parallel",
+                            "attention.enable_channel_attention": True,
+                            "attention.mlp_bottleneck": 8,
+                            "attention.has_spatial_attention_phases": (False, True, True),
+                            "attention.has_spatial_attention_norms": (False, True, True),
+                            "attention.spatial_attention_map_channel_from": "all",
+                            "attention.spatial_attention_map_channel_for": "group",
+                            "block.base_branch_channels": 32,
+                            "block.relative_rfs": (2, 4, 6),
+                            "block.attention_name": "AttentionForAblation",
+                            "down_layer.block_name": "RSBAlterC",}),
     ),
     head=dict(
         type='MSPNHead',
