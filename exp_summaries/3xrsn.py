@@ -10,11 +10,17 @@ class Experiment:
         self.legend = legend
         self.loss_epoch_x, self.loss_epoch_y, self.ap_epoch_x, self.ap_epoch_y = get_training_curves_data(self.file_name)
 
-experiments = [Experiment(file_name="/work_dirs/ian_td-hm_3xrsn50_8xb32-210e_coco-256x192/20250922_092011/vis_data/20250922_092011.json",
+experiments = [Experiment(file_name="/data/ian/remote_projects/mmpose/work_dirs/"
+                                    "ian_td-hm_3xrsn50_8xb32-210e_coco-256x192/"
+                                    "20250922_092011/vis_data/20250922_092011.json",
                           legend="3xRSN-50"),
-               Experiment(file_name="/work_dirs/ian_td-hm_3xrsn-alter-c_8xb32-210e_coco-256x192/20260109_224458/vis_data/20260109_224458.json",
+               Experiment(file_name="/data/ian/remote_projects/mmpose/work_dirs/"
+                                    "ian_td-hm_3xrsn-alter-c_8xb32-210e_coco-256x192/"
+                                    "20260109_224458/vis_data/20260109_224458.json",
                           legend="3xRSN-50 Alter C"),
-               Experiment(file_name="/work_dirs/ian_td-hm_4xrsn-alter-c_3xb64-210e_coco-384x288/20260112_154914/vis_data/20260112_154914.json",
+               Experiment(file_name="/data/ian/remote_projects/mmpose/work_dirs/"
+                                    "ian_td-hm_4xrsn-alter-c_3xb64-210e_coco-384x288/"
+                                    "20260112_154914/vis_data/20260112_154914.json",
                           legend="4xRSN-50 Alter C"),
                ]
 

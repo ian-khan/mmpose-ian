@@ -10,9 +10,13 @@ class Experiment:
         self.legend = legend
         self.loss_epoch_x, self.loss_epoch_y, self.ap_epoch_x, self.ap_epoch_y = get_training_curves_data(self.file_name)
 
-experiments = [Experiment(file_name="/work_dirs/ian_td-hm_rsn-ian_8xb32-210e_coco-256x192/20251126_173025/vis_data/20251126_173025.json",
+experiments = [Experiment(file_name="/data/ian/remote_projects/mmpose/work_dirs/"
+                                    "ian_td-hm_rsn-ian_8xb32-210e_coco-256x192/"
+                                    "20251126_173025/vis_data/20251126_173025.json",
                           legend="Ian Baseline"),
-               Experiment(file_name="/work_dirs/ian_td-hm_rsn-ian_3xb512-200e_coco-256x192_optim-schdl/20260117_043533/vis_data/20260117_043533.json",
+               Experiment(file_name="/data/ian/remote_projects/mmpose/work_dirs/"
+                                    "ian_td-hm_rsn-ian_3xb512-200e_coco-256x192_optim-schdl/"
+                                    "20260117_043533/vis_data/20260117_043533.json",
                           legend="Optimizer Scheduler"),]
 
 plt.figure()

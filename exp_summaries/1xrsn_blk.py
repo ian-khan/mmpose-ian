@@ -2,7 +2,7 @@ from pathlib import Path
 from pose_estimation.analysis import Experiment
 from matplotlib import pyplot as plt
 
-experiments = [Experiment(work_dir=Path("/work_dirs/",
+experiments = [Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/",
                                         "ian_td-hm_rsn-ian_3xb128-360e_coco-256x192_it-ol"),
                           exp_times=["20260121_214515",
                                      "20260122_200638",
@@ -10,7 +10,8 @@ experiments = [Experiment(work_dir=Path("/work_dirs/",
                                      "20260123_174904",
                                      "20260124_000245"],
                           label="RSB-Ian"),
-               Experiment(work_dir=Path("/work_dirs/ian_ab_td-hm_rsn-alter-c_3xb128-360e_coco-256x192"),
+               Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
+                                        "ian_ab_td-hm_rsn-alter-c_3xb128-360e_coco-256x192"),
                           exp_times=["20260127_133523"],
                           label="RSB Alter C"),
                ]
