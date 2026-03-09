@@ -26,6 +26,11 @@ experiments = [
                              "ian_ab-blk-att-5_td-hm_rsn50-c_3xb128-200e_coco-256x192"),
                exp_times=["20260303_171614", "20260304_124755"],
                label="Exp 5"),
+    Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
+                             "ian_ab-blk-att-6_td-hm_rsn50-c_3xb128-200e_coco-256x192"),
+               exp_times=["20260306_132700", "20260308_121249",
+                          "20260308_185003", "20260309_104927"],
+               label="Exp 6"),
 ]
 
 Experiment.draw_epoch_coco_ap_curve(experiments, ylim=(0.4, 0.75), output="show")

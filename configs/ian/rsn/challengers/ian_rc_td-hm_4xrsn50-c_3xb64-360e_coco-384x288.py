@@ -43,8 +43,8 @@ param_scheduler = [dict(type='LinearLR',
 auto_scale_lr = dict(base_batch_size=384)
 
 # hooks
-default_hooks = dict(checkpoint=dict(interval=5,
-                                     max_keep_ckpts=3,
+default_hooks = dict(checkpoint=dict(interval=1,
+                                     max_keep_ckpts=15,
                                      save_last=True,
                                      save_best='coco/AP',
                                      rule='greater'))
