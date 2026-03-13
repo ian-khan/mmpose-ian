@@ -1,34 +1,44 @@
-"""Config testing the HRNet-Ian reimplementation"""
+"""Friday, 2026/03/13
+Train the reimplemented HRNet, with an RSBAlterC-like block renamed to HRNetBlock"""
+
 _base_ = ['../../../_base_/default_runtime.py']
 
+custom_imports = dict(
+    imports=['pose_estimation.models.backbones',
+             'pose_estimation.models.blocks',
+             'pose_estimation.models.structures',],
+    allow_failed_imports=False
+)
+
 # runtime
-train_cfg = dict(max_epochs=210, val_interval=10)
+train_cfg = dict(max_epochs=210, val_interval=5)
 
 # optimizer
-optim_wrapper = dict(optimizer=dict(
-    type='Adam',
-    lr=5e-4,
-))
+optim_wrapper = dict(optimizer=dict(type='Adam',
+                                    lr=7.5e-3))
 
 # learning policy
-param_scheduler = [
-    dict(
-        type='LinearLR', begin=0, end=500, start_factor=0.001,
-        by_epoch=False),  # warm-up
-    dict(
-        type='MultiStepLR',
-        begin=0,
-        end=210,
-        milestones=[170, 200],
-        gamma=0.1,
-        by_epoch=True)
-]
+param_scheduler = [dict(type='LinearLR',
+                        begin=0,
+                        end=500,
+                        start_factor=0.001,
+                        by_epoch=False),
+                   dict(type='MultiStepLR',
+                        begin=0,
+                        end=200,
+                        milestones=[160, 190],
+                        gamma=0.1,
+                        by_epoch=True)]
 
 # automatically scaling LR based on the actual training batch size
-auto_scale_lr = dict(base_batch_size=512)
+auto_scale_lr = dict(base_batch_size=384)
 
 # hooks
-default_hooks = dict(checkpoint=dict(save_best='coco/AP', rule='greater'))
+default_hooks = dict(checkpoint=dict(interval=5,
+                                     max_keep_ckpts=3,
+                                     save_last=True,
+                                     save_best='coco/AP',
+                                     rule='greater'))
 
 # codec settings
 codec = dict(
@@ -43,37 +53,18 @@ model = dict(
         std=[58.395, 57.12, 57.375],
         bgr_to_rgb=True),
     backbone=dict(
-        type='HRNet',
-        in_channels=3,
-        extra=dict(
-            stage1=dict(
-                num_modules=1,
-                num_branches=1,
-                block='BOTTLENECK',
-                num_blocks=(4, ),
-                num_channels=(64, )),
-            stage2=dict(
-                num_modules=1,
-                num_branches=2,
-                block='BASIC',
-                num_blocks=(4, 4),
-                num_channels=(32, 64)),
-            stage3=dict(
-                num_modules=4,
-                num_branches=3,
-                block='BASIC',
-                num_blocks=(4, 4, 4),
-                num_channels=(32, 64, 128)),
-            stage4=dict(
-                num_modules=3,
-                num_branches=4,
-                block='BASIC',
-                num_blocks=(4, 4, 4, 4),
-                num_channels=(32, 64, 128, 256))),
-        init_cfg=dict(
-            type='Pretrained',
-            checkpoint='https://download.openmmlab.com/mmpose/'
-            'pretrain_models/hrnet_w32-36af842e.pth'),
+        type='HRNetRenewed',
+        cfg_overrides={"level.block_name": "HRNetBlock",
+                       "block.attention_name": "HRNetBlockAttention",
+                       "block.base_branch_channels": 21,
+                       "block_attention.enable_skip_connection": True,
+                       "block_attention.attention_order": "parallel",
+                       "block_attention.enable_channel_attention": True,
+                       "block_attention.mlp_bottleneck": 8,
+                       "block_attention.has_spatial_attention_phases": (False, True, True),
+                       "block_attention.has_spatial_attention_norms": (False, True, True),
+                       "block_attention.spatial_attention_map_channel_from": "all",
+                       "block_attention.spatial_attention_map_channel_for": "group",},
     ),
     head=dict(
         type='HeatmapHead',
@@ -91,7 +82,7 @@ model = dict(
 # base dataset settings
 dataset_type = 'CocoDataset'
 data_mode = 'topdown'
-data_root = 'data/coco/'
+data_root = '/data/ian/datasets/coco/'
 
 # pipelines
 train_pipeline = [
@@ -113,7 +104,7 @@ val_pipeline = [
 
 # data loaders
 train_dataloader = dict(
-    batch_size=64,
+    batch_size=48,
     num_workers=2,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -126,7 +117,7 @@ train_dataloader = dict(
         pipeline=train_pipeline,
     ))
 val_dataloader = dict(
-    batch_size=32,
+    batch_size=48,
     num_workers=2,
     persistent_workers=True,
     drop_last=False,
