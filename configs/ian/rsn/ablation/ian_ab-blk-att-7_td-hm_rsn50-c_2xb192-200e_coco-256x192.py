@@ -69,18 +69,20 @@ model = dict(
     backbone=dict(
         type='ResidualStepsNetwork',
         stage_layer_blocks=((3, 4, 6, 3),),
-        cfg_overrides=dict({"attention.enable_skip_connection": False,
+        cfg_overrides=dict({"down_layer.block_name": "RSBAlterC",
+                            "block.base_branch_channels": 32,
+                            "block.relative_rfs": (2, 4, 6),
+                            "block.attention_name": "AttentionForAblation",
+                            "attention.enable_skip_connection": True,
+                            "attention.use_centered_gating":  True,
                             "attention.attention_order": "parallel",
                             "attention.enable_channel_attention": True,
                             "attention.mlp_bottleneck": 8,
                             "attention.has_spatial_attention_phases": (False, True, True),
-                            "attention.has_spatial_attention_norms": (False, True, False),
+                            "attention.has_spatial_attention_norms": (False, True, True),
                             "attention.spatial_attention_map_channel_from": "all",
-                            "attention.spatial_attention_map_channel_for": "group",
-                            "block.base_branch_channels": 32,
-                            "block.relative_rfs": (2, 4, 6),
-                            "block.attention_name": "AttentionForAblation",
-                            "down_layer.block_name": "RSBAlterC",}),
+                            "attention.spatial_attention_map_channel_for": "group",}),
+
     ),
     head=dict(
         type='MSPNHead',
@@ -137,7 +139,7 @@ val_pipeline = [
 
 # data loaders
 train_dataloader = dict(
-    batch_size=128,
+    batch_size=192,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -150,7 +152,7 @@ train_dataloader = dict(
         pipeline=train_pipeline,
     ))
 val_dataloader = dict(
-    batch_size=128,
+    batch_size=192,
     num_workers=4,
     persistent_workers=True,
     drop_last=False,
