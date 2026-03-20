@@ -1,6 +1,6 @@
-"""Wednesday, 2026/03/17;
-RSN-50-Ian as backbone;
-RSB Alter C as block;
+"""Thursday, 2026/03/19;
+4xRSN-50-Ian as backbone;
+RSB Alter C as block, base branch channels 16;
 * Skip Connection around attention enabled, use centered gating;
 Channel Attention enabled, (Avg Pool, 1/8, ReLU, 8, Sigmoid);
 Spatial Attention enabled, (DW 9x9 C>C, BN, ReLU, PW C>G, BN, ReLU, Sigmoid);
@@ -41,7 +41,7 @@ param_scheduler = [dict(type='LinearLR',
 auto_scale_lr = dict(base_batch_size=384)
 
 # hooks
-default_hooks = dict(checkpoint=dict(interval=10,
+default_hooks = dict(checkpoint=dict(interval=5,
                                      max_keep_ckpts=3,
                                      save_last=True,
                                      save_best='coco/AP',
@@ -49,7 +49,7 @@ default_hooks = dict(checkpoint=dict(interval=10,
 
 # codec settings
 # multiple kernel_sizes of heatmap gaussian for 'Megvii' approach.
-kernel_sizes = [11, 9, 7, 5]
+kernel_sizes = [15, 11, 9, 7, 5]
 codec = [
     dict(
         type='MegviiHeatmap',
@@ -68,9 +68,13 @@ model = dict(
         bgr_to_rgb=True),
     backbone=dict(
         type='ResidualStepsNetwork',
-        stage_layer_blocks=((3, 4, 6, 3),),
-        cfg_overrides=dict({"down_layer.block_name": "RSBAlterC",
-                            "block.base_branch_channels": 32,
+        stage_layer_blocks=((3, 4, 6, 3),
+                            (3, 4, 6, 3),
+                            (3, 4, 6, 3),
+                            (3, 4, 6, 3),),
+        cfg_overrides=dict({"stage.in_channels": 32,
+                            "down_layer.block_name": "RSBAlterC",
+                            "block.base_branch_channels": 16,
                             "block.relative_rfs": (2, 4, 6),
                             "block.attention_name": "AttentionForAblation",
                             "attention.enable_skip_connection": True,
@@ -82,20 +86,19 @@ model = dict(
                             "attention.has_spatial_attention_norms": (False, True, True),
                             "attention.spatial_attention_map_channel_from": "all",
                             "attention.spatial_attention_map_channel_for": "group",}),
-
     ),
     head=dict(
         type='MSPNHead',
         out_shape=(64, 48),
         unit_channels=256,
         out_channels=17,
-        num_stages=1,
+        num_stages=4,
         num_units=4,
         norm_cfg=dict(type='BN'),
         # each sub list is for a stage
         # and each element in each list is for a unit
-        level_indices=[0, 1, 2, 3],
-        loss=[
+        level_indices=[0, 1, 2, 3] * 3 + [1, 2, 3, 4],
+        loss=([
             dict(
                 type='KeypointMSELoss',
                 use_target_weight=True,
@@ -105,7 +108,7 @@ model = dict(
                 type='KeypointOHKMMSELoss',
                 use_target_weight=True,
                 loss_weight=1.)
-        ],
+        ]) * 4,
         decoder=codec[-1]),
     test_cfg=dict(
         flip_test=True,
