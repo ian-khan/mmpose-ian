@@ -37,7 +37,7 @@ experiments = [
                label="Exp 6"),
 ]
 
-# Experiment.draw_iter_lr_curve(experiments, output="show")
-# Experiment.draw_epoch_avg_loss_curve(experiments, ylim=(80.0, 100.0), output="show")
-# Experiment.draw_epoch_coco_ap_curve(experiments, ylim=(0.4, 0.75), output="show")
+Experiment.draw_iter_lr_curve(experiments, output="show")
+Experiment.draw_epoch_avg_loss_curve(experiments, ylim=(80.0, 100.0), output="show")
+Experiment.draw_epoch_coco_ap_curve(experiments, ylim=(0.4, 0.75), output="show")
 Experiment.get_leader_board(experiments, 5, 61, 5)
