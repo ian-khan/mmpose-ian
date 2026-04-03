@@ -1,4 +1,4 @@
-"""Monday, 2026/03/23 (Created);
+"""Monday, 2026/03/23 (created), 2026/04/02 (used);
 RSN-50-Ian as backbone;
 RSB Alter C as block;
 Skip Connection around attention enabled;
@@ -69,18 +69,18 @@ model = dict(
     backbone=dict(
         type='ResidualStepsNetwork',
         stage_layer_blocks=((3, 4, 6, 3),),
-        cfg_overrides=dict({"attention.enable_skip_connection": False,
+        cfg_overrides=dict({"down_layer.block_name": "RSBAlterC",
+                            "block.base_branch_channels": 32,
+                            "block.relative_rfs": (2, 4, 6),
+                            "block.attention_name": "AttentionForAblation",
+                            "attention.enable_skip_connection": True,
                             "attention.attention_order": "parallel",
                             "attention.enable_channel_attention": True,
                             "attention.mlp_bottleneck": 8,
                             "attention.has_spatial_attention_phases": (False, True, True),
-                            "attention.has_spatial_attention_norms": (False, True, False),
+                            "attention.has_spatial_attention_norms": (False, False, False),
                             "attention.spatial_attention_map_channel_from": "all",
-                            "attention.spatial_attention_map_channel_for": "group",
-                            "block.base_branch_channels": 32,
-                            "block.relative_rfs": (2, 4, 6),
-                            "block.attention_name": "AttentionForAblation",
-                            "down_layer.block_name": "RSBAlterC",}),
+                            "attention.spatial_attention_map_channel_for": "group",}),
     ),
     head=dict(
         type='MSPNHead',

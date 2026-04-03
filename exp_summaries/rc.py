@@ -15,7 +15,7 @@ exps = [
                label="Exp -1"),
     Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
                              "ian_rc-0_td-hm_4xrsn50-c_3x64-360e_coco-384x288"),
-               exp_times=["20260322_115737",],
+               exp_times=["20260322_115737", "20260329_003404"],
                label="Exp 0"),
 ]
 
