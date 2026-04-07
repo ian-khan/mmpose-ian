@@ -2,13 +2,8 @@
 Config for 4xRSN-MMPose, trained for 210 epochs,
 to be compared with RSN with RSB-C"""
 
-custom_imports = dict(
-    imports=['pose_estimation.models.backbones.rsn_ian',
-             'pose_estimation.models.blocks.cnn_blocks'],
-    allow_failed_imports=False
-)
 
-_base_ = ['../_base_/default_runtime.py']
+_base_ = ['../../../_base_/default_runtime.py']
 
 # runtime
 train_cfg = dict(max_epochs=210, val_interval=5)
@@ -16,7 +11,7 @@ train_cfg = dict(max_epochs=210, val_interval=5)
 # optimizer
 optim_wrapper = dict(optimizer=dict(
     type='Adam',
-    lr=5e-3,
+    lr=7.5e-3,
 ))
 
 # learning policy
@@ -28,17 +23,17 @@ param_scheduler = [
         type='MultiStepLR',
         begin=0,
         end=210,
-        milestones=[160, 190],
+        milestones=[170, 200],
         gamma=0.1,
         by_epoch=True)
 ]
 
 # automatically scaling LR based on the actual training batch size
-auto_scale_lr = dict(base_batch_size=256)
+auto_scale_lr = dict(base_batch_size=384)
 
 # hooks
 default_hooks = dict(checkpoint=dict(interval=5,
-                                     max_keep_ckpts=10,
+                                     max_keep_ckpts=3,
                                      save_last=True,
                                      save_best='coco/AP',
                                      rule='greater'))
@@ -63,13 +58,13 @@ model = dict(
         std=[58.395, 57.12, 57.375],
         bgr_to_rgb=True),
     backbone=dict(
-        type='ResidualStepsNetwork',
-        stage_layer_blocks=((3, 4, 6, 3),
-                            (3, 4, 6, 3),
-                            (3, 4, 6, 3),
-                            (3, 4, 6, 3)),
-        cfg_overrides={"down_layer.block_name": "RSBAlterC",
-                       "block.relative_rfs": (2, 4, 6)},
+        type='RSN',
+        unit_channels=256,
+        num_stages=4,
+        num_units=4,
+        num_blocks=[3, 4, 6, 3],
+        num_steps=4,
+        norm_cfg=dict(type='BN'),
     ),
     head=dict(
         type='MSPNHead',
