@@ -10,9 +10,13 @@ experiments = [
                              "ian_ab-rsb-e-0_td-hm_rsn50_3xb128-200e_coco-256x192"),
                exp_times="20260407_152714",
                label="RSB-E Exp 0"),
+    Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
+                             "ian_ab-rsb-e-1_td-hm_rsn50_3xb128-200e_coco-256x192"),
+               exp_times=["20260408_211759", "20260409_174028"],
+               label="RSB-E Exp 1"),
 ]
 
 Experiment.draw_iter_lr_curve(experiments, output="show")
-Experiment.draw_epoch_avg_loss_curve(experiments, ylim=(80.0, 100.0), output="show")
+Experiment.draw_epoch_avg_loss_curve(experiments, output="show")
 Experiment.draw_epoch_coco_ap_curve(experiments, xlim=(0.0, 200.0), ylim=(0.4, 0.74), output="show")
 # Experiment.get_leader_board(experiments, 5, 201, 5)
