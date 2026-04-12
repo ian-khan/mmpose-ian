@@ -14,10 +14,14 @@ experiments = [
                              "ian_ab-rsb-e-1_td-hm_rsn50_3xb128-200e_coco-256x192"),
                exp_times=["20260408_211759", "20260409_174028"],
                label="RSB-E Exp 1"),
-Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
+    Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
                              "ian_ab-rsb-e-2_td-hm_rsn50_3xb128-200e_coco-256x192"),
                exp_times=["20260410_193705", "20260411_005043"],
                label="RSB-E Exp 2"),
+    Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
+                             "ian_ab-rsb-e-3_td-hm_rsn50_3xb128-200e_coco-256x192"),
+               exp_times=["20260411_223926"],
+               label="RSB-E Exp 3"),
 ]
 
 Experiment.draw_iter_lr_curve(experiments, output="show")

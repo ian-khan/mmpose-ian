@@ -1,9 +1,9 @@
 """Sunday, 2026/04/12;
 RSN-50-Ian as backbone;
 RSB Alter E as block, ((3,), (3, 3,), (3, 3, 3,),);
-Skip Connection around attention enabled;
+Skip Connection around attention enabled, vanilla skip;
 Channel Attention enabled, (Avg Pool, 1/8, ReLU, 8, Sigmoid);
-Spatial Attention enabled, (DW 9x9 C2C, ReLU, PW C2C, ReLU, PW C2G, Sigmoid);
+Spatial Attention enabled, (DW 5x5 C2C, BN, ReLU, PW C2C, ReLU, PW C2G, Sigmoid);
 Channel and Spatial Attention in parallel;
 Trained for 200 epochs;
 MMPose style Optimizer and LR Schedulers (0.1, 165, 195)"""
@@ -11,7 +11,8 @@ MMPose style Optimizer and LR Schedulers (0.1, 165, 195)"""
 _base_ = ['../../../_base_/default_runtime.py']
 
 custom_imports = dict(
-    imports=['pose_estimation.models.backbones',
+    imports=['pose_estimation.datasets',
+             'pose_estimation.models.backbones',
              'pose_estimation.models.blocks',
              'pose_estimation.models.structures',],
     allow_failed_imports=False
@@ -72,19 +73,19 @@ model = dict(
         cfg_overrides=dict({
             "down_layer.block_name": "RSBAlterE",
             "block.attention_name": "RSBAttentionE",
-            "block.base_branch_channels": (32, 32, 32),
+            "block.base_branch_channels": (30, 30, 30),
             "block.branch_convs": (("3x3",),
                                    ("3x3", "3x3",),
                                    ("3x3", "3x3", "3x3",),),
-            "attention.enable_skip_connection": False,
+            "attention.enable_skip_connection": True,
             "attention.use_centered_gating": False,
             "attention.attention_order": "parallel",
             "attention.enable_channel_attention": True,
             "attention.mlp_bottleneck": 8,
-            "attention.has_spatial_attention_phases": (True, False, True),
-            "attention.has_spatial_attention_norms": (True, False, True),
-            "attention.spatial_attention_phase_0_kernel_size": 9,
-            "attention.has_spatial_attention_phase_2_act": True,
+            "attention.has_spatial_attention_phases": (True, True, True),
+            "attention.has_spatial_attention_norms": (True, False, False),
+            "attention.spatial_attention_phase_0_kernel_size": 5,
+            "attention.has_spatial_attention_phase_2_act": False,
             "attention.spatial_attention_map_channel_from": "all",
             "attention.spatial_attention_map_channel_for": "group",
         }),
