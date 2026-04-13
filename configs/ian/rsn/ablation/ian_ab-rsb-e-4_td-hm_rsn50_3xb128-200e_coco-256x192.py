@@ -1,10 +1,10 @@
 """Monday, 2026/04/13;
 RSN-50-Ian as backbone;
 RSB Alter E as block, ((3,), (3, 3,), (3, 3, 3,),);
-Skip Connection around attention enabled, centered gating;
-Channel Attention enabled, (Avg Pool, 1/8, ReLU, 8, Sigmoid);
+Skip Connection around attention disabled;
 Spatial Attention enabled, (DW 5x5 C2C, BN, ReLU, PW C2C, ReLU, PW C2G, Sigmoid);
-Channel and Spatial Attention in parallel;
+Channel Attention enabled, (Avg Pool, 1/8, ReLU, 8, Sigmoid);
+Spatial Attention then Channel Attention;
 Trained for 200 epochs;
 MMPose style Optimizer and LR Schedulers (0.1, 165, 195)"""
 
@@ -77,9 +77,9 @@ model = dict(
             "block.branch_convs": (("3x3",),
                                    ("3x3", "3x3",),
                                    ("3x3", "3x3", "3x3",),),
-            "attention.enable_skip_connection": True,
+            "attention.enable_skip_connection": False,
             "attention.use_centered_gating": False,
-            "attention.attention_order": "parallel",
+            "attention.attention_order": "s then c",
             "attention.enable_channel_attention": True,
             "attention.mlp_bottleneck": 8,
             "attention.has_spatial_attention_phases": (True, True, True),
@@ -120,7 +120,7 @@ model = dict(
     ))
 
 # base dataset settings
-dataset_type = 'CocoDataset'
+dataset_type = 'CachedCOCODataset'
 data_mode = 'topdown'
 data_root = '/data/ian/datasets/coco/'
 

@@ -14,10 +14,10 @@ experiments = [
                              "ian_ab-blk-att-2_td-hm_rsn50-c_3xb128-200e_coco-256x192"),
                exp_times="20260209_133443",
                label="Exp 2"),
-    # Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
-    #                          "ian_ab-blk-att-2_td-hm_rsn50-c_3xb128-200e_coco-256x192"),
-    #            exp_times="20260310_122719",
-    #            label="Exp 2-2"),
+    Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
+                             "ian_ab-blk-att-2_td-hm_rsn50-c_3xb128-200e_coco-256x192"),
+               exp_times="20260310_122719",
+               label="Exp 2-2"),
     # Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
     #                          "ian_ab-blk-att-3_td-hm_rsn50-c_3xb128-200e_coco-256x192"),
     #            exp_times="20260210_222517",
