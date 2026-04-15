@@ -1,9 +1,9 @@
 """Wednesday, 2026/04/15;
 RSN-50-Ian as backbone;
 RSB Alter E as block, ((3,), (3, 3,), (3, 3, 3,),);
-Skip Connection around attention enabled, adaptive;
+Skip Connection around attention disabled;
 Channel Attention enabled, (Avg Pool, 1/8, ReLU, 8, Sigmoid);
-Spatial Attention enabled, (DW 9x9 C2C, BN, ReLU, PW C2G, IN, Sigmoid);
+Spatial Attention enabled, (DW 9x9 C2C, BN, ReLU, PW C2G, IN, ReLU, Sigmoid);
 Channel and Spatial Attention in parallel;
 Trained for 200 epochs;
 MMPose style Optimizer and LR Schedulers (0.1, 165, 195)"""
@@ -82,9 +82,9 @@ model = dict(
             "attention.enable_channel_attention": True,
             "attention.mlp_bottleneck": 8,
             "attention.has_spatial_attention_phases": (True, False, True),
-            "attention.has_spatial_attention_norms": (True, False, 'IN'),
+            "attention.has_spatial_attention_norms": (True, False, "IN"),
             "attention.spatial_attention_phase_0_kernel_size": 9,
-            "attention.has_spatial_attention_phase_2_act": False,
+            "attention.has_spatial_attention_phase_2_act": True,
             "attention.spatial_attention_map_channel_from": "all",
             "attention.spatial_attention_map_channel_for": "group",
         }),
