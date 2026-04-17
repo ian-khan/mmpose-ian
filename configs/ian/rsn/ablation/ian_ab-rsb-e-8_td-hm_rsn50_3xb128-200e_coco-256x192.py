@@ -6,7 +6,7 @@ Channel Attention enabled, (Avg Pool, 1/8, ReLU, 8, Sigmoid);
 Spatial Attention enabled, (DW 9x9 C2C, BN, ReLU, PW, ReLU, PW C2G, IN, Sigmoid);
 Channel and Spatial Attention in parallel;
 Trained for 200 epochs;
-MMPose style Optimizer and LR Schedulers (0.1, 165, 195)"""
+MMPose style Optimizer and LR Schedulers (0.1, 160, 190)"""
 
 _base_ = ['../../../_base_/default_runtime.py']
 
@@ -33,7 +33,7 @@ param_scheduler = [dict(type='LinearLR',
                    dict(type='MultiStepLR',
                         begin=0,
                         end=200,
-                        milestones=[165, 195],
+                        milestones=[160, 190],
                         gamma=0.1,
                         by_epoch=True)]
 
@@ -72,7 +72,7 @@ model = dict(
         cfg_overrides=dict({
             "down_layer.block_name": "RSBAlterE",
             "block.attention_name": "RSBAttentionE",
-            "block.base_branch_channels": (32, 32, 32),
+            "block.base_branch_channels": (30, 30, 30),
             "block.branch_convs": (("3x3",),
                                    ("3x3", "3x3",),
                                    ("3x3", "3x3", "3x3",),),
@@ -82,7 +82,7 @@ model = dict(
             "attention.attention_order": "parallel",
             "attention.enable_channel_attention": True,
             "attention.mlp_bottleneck": 8,
-            "attention.has_spatial_attention_phases": (True, False, True),
+            "attention.has_spatial_attention_phases": (True, True, True),
             "attention.has_spatial_attention_norms": (True, False, "IN"),
             "attention.spatial_attention_phase_0_kernel_size": 9,
             "attention.has_spatial_attention_phase_2_act": False,
