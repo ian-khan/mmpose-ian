@@ -5,10 +5,10 @@ Skip Connection around attention enabled (adaptive);
 Channel Attention enabled, (Avg Pool, 1/8, ReLU, 8, Sigmoid);
 Spatial Attention enabled, (DW 9x9 C2C, BN, ReLU, PW, ReLU, PW C2G, IN, Sigmoid);
 Channel and Spatial Attention in parallel;
-MMPose style Optimizer and LR Schedulers (Adam, 210 epochs, Step LR);
+MMPose style Optimizer (Adam) and LR Schedulers (Step LR, 210 epochs, 0.1, 170, 200);
 """
 
-_base_ = ['../../../_base_/default_runtime.py']
+_base_ = ['/data/ian/remote_projects/mmpose/configs/_base_/default_runtime.py']
 
 custom_imports = dict(
     imports=['pose_estimation.models.backbones',
@@ -18,32 +18,31 @@ custom_imports = dict(
 )
 
 # runtime
-train_cfg = dict(max_epochs=360, val_interval=5)
+train_cfg = dict(max_epochs=210, val_interval=5)
 
 # optimizer
 optim_wrapper = dict(optimizer=dict(type='Adam',
-                                    lr=4e-3,
-                                    weight_decay=1e-5))
+                                    lr=7.5e-3,))
 
 # learning policy
 param_scheduler = [dict(type='LinearLR',
                         begin=0,
-                        end=2400,
+                        end=500,
                         start_factor=0.1,
                         by_epoch=False),
-                   dict(type='PolyLR',
-                        eta_min=0.0,
-                        power=1,
+                   dict(type='MultiStepLR',
                         begin=0,
-                        end=281160,
-                        by_epoch=False)]
+                        end=210,
+                        milestones=[170, 200],
+                        gamma=0.1,
+                        by_epoch=True)]
 
 # automatically scaling LR based on the actual training batch size
 auto_scale_lr = dict(base_batch_size=384)
 
 # hooks
 default_hooks = dict(checkpoint=dict(interval=1,
-                                     max_keep_ckpts=15,
+                                     max_keep_ckpts=3,
                                      save_last=True,
                                      save_best='coco/AP',
                                      rule='greater'))
@@ -73,16 +72,22 @@ model = dict(
                             (3, 4, 6, 3),
                             (3, 4, 6, 3),
                             (3, 4, 6, 3),),
-        cfg_overrides=dict({"down_layer.block_name": "RSBAlterC",
-                            "block.relative_rfs": (2, 4, 6),
-                            "block.attention_name": "AttentionForAblation",
+        cfg_overrides=dict({"down_layer.block_name": "RSBAlterE",
+                            "block.attention_name": "RSBAttentionE",
+                            "block.base_branch_channels": (30, 30, 30),
+                            "block.branch_convs": (("3x3",),
+                                                   ("3x3", "3x3",),
+                                                   ("3x3", "3x3", "3x3",),),
                             "attention.enable_skip_connection": True,
-                            "attention.use_centered_gating":  False,
+                            "attention.use_centered_gating": False,
+                            "attention.skip_style": "adaptive",
                             "attention.attention_order": "parallel",
                             "attention.enable_channel_attention": True,
                             "attention.mlp_bottleneck": 8,
-                            "attention.has_spatial_attention_phases": (False, True, True),
-                            "attention.has_spatial_attention_norms": (False, True, True),
+                            "attention.has_spatial_attention_phases": (True, True, True),
+                            "attention.has_spatial_attention_norms": (True, False, "IN"),
+                            "attention.spatial_attention_phase_0_kernel_size": 9,
+                            "attention.has_spatial_attention_phase_2_act": False,
                             "attention.spatial_attention_map_channel_from": "all",
                             "attention.spatial_attention_map_channel_for": "group",}),
     ),
