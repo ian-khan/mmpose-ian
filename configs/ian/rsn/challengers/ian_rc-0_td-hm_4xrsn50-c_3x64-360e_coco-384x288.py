@@ -1,7 +1,7 @@
 """Sunday, 2026/03/22;
 4xRSN-50-Ian as backbone;
 RSB Alter C as block;
-Skip Connection around attention disabled (Usual skip connection);
+Skip Connection around attention enabled (Usual skip connection);
 Channel Attention enabled, (Avg Pool, 1/8, ReLU, 8, Sigmoid);
 Spatial Attention enabled, (DW 9x9 C>C, BN, ReLU, PW C>G, BN, ReLU, Sigmoid);
 Channel and Spatial Attention in parallel;
@@ -75,6 +75,7 @@ model = dict(
                             (3, 4, 6, 3),
                             (3, 4, 6, 3),),
         cfg_overrides=dict({"down_layer.block_name": "RSBAlterC",
+                            "block.base_branch_channels": 16,
                             "block.relative_rfs": (2, 4, 6),
                             "block.attention_name": "AttentionForAblation",
                             "attention.enable_skip_connection": True,

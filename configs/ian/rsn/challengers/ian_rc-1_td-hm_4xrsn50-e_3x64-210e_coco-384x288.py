@@ -3,7 +3,7 @@
 RSB Alter E as block, ((3,), (3, 3,), (3, 3, 3,),);
 Skip Connection around attention enabled (adaptive);
 Channel Attention enabled, (Avg Pool, 1/8, ReLU, 8, Sigmoid);
-Spatial Attention enabled, (DW 9x9 C2C, BN, ReLU, PW, ReLU, PW C2G, IN, Sigmoid);
+Spatial Attention enabled, (DW 9x9 C2C, BN, ReLU, PW C2G, IN, Sigmoid);
 Channel and Spatial Attention in parallel;
 MMPose style Optimizer (Adam) and LR Schedulers (Step LR, 210 epochs, 0.1, 170, 200);
 """
@@ -74,7 +74,7 @@ model = dict(
                             (3, 4, 6, 3),),
         cfg_overrides=dict({"down_layer.block_name": "RSBAlterE",
                             "block.attention_name": "RSBAttentionE",
-                            "block.base_branch_channels": (30, 30, 30),
+                            "block.base_branch_channels": (32, 32, 32),
                             "block.branch_convs": (("3x3",),
                                                    ("3x3", "3x3",),
                                                    ("3x3", "3x3", "3x3",),),
@@ -84,7 +84,7 @@ model = dict(
                             "attention.attention_order": "parallel",
                             "attention.enable_channel_attention": True,
                             "attention.mlp_bottleneck": 8,
-                            "attention.has_spatial_attention_phases": (True, True, True),
+                            "attention.has_spatial_attention_phases": (True, False, True),
                             "attention.has_spatial_attention_norms": (True, False, "IN"),
                             "attention.spatial_attention_phase_0_kernel_size": 9,
                             "attention.has_spatial_attention_phase_2_act": False,
