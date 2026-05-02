@@ -5,7 +5,7 @@ exps = [
     Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
                              "ian_td-hm_4xrsn-alter-c_3xb64-210e_coco-384x288"),
                exp_times="20260112_154914",
-               label="Exp 210e"),
+               label="C-1"),
     # Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
     #                          "ian_rc_td-hm_4xrsn50-c_3xb64-360e_coco-384x288"),
     #            exp_times=["20260215_165825", "20260219_123923",
@@ -19,8 +19,12 @@ exps = [
     #            label="Exp 0"),
     Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
                              "ian_rc-1_td-hm_4xrsn50-e_3x60-210e_coco-384x288"),
-               exp_times=["20260419_151132", "20260420_144400"],
-               label="Exp 1"),
+               exp_times=["20260419_151132", "20260420_181809"],
+               label="E-7"),
+    Experiment(work_dir=Path("/data/ian/remote_projects/mmpose/work_dirs/"
+                             "rc-e-9_4-stage_3x60-210e_coco-384x288"),
+               exp_times=["20260501_182257"],
+               label="E-9"),
 ]
 
 Experiment.draw_iter_lr_curve(exps, output="show")
